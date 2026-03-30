@@ -1,10 +1,13 @@
 import { useState, useMemo } from 'react'
 import { useProducts } from '../context/ProductContext'
+import { useSiteContent } from '../context/SiteContentContext'
 import ProductCard from '../components/ProductCard'
 import './ShopPage.css'
 
 export default function ShopPage() {
   const { allProducts, categories } = useProducts()
+  const { content } = useSiteContent()
+  const shop = content.shop
   const [activeCategory, setActiveCategory] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -21,9 +24,9 @@ export default function ShopPage() {
     <div className="shop-page">
       <header className="page-hero">
         <div className="container">
-          <span className="badge badge-featured">Fresh & Healthy</span>
-          <h1>Our Full <span className="text-lime">Collection</span></h1>
-          <p>Explore all our homemade delicacies in one place.</p>
+          <span className="badge badge-featured">{shop.badge}</span>
+          <h1>{shop.heroTitle.split(' ').slice(0, -1).join(' ')} <span className="text-lime">{shop.heroTitle.split(' ').slice(-1)}</span></h1>
+          <p>{shop.heroSubtitle}</p>
         </div>
       </header>
 
@@ -54,7 +57,7 @@ export default function ShopPage() {
                   className={`filter-btn ${activeCategory === cat.slug ? 'active' : ''}`}
                   onClick={() => setActiveCategory(cat.slug)}
                 >
-                  <img src={cat.image?.url} alt={cat.name} style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover', display: 'inline-block', marginRight: 8, verticalAlign: 'middle' }} /> 
+                  <img src={cat.image?.url} alt={cat.name} style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover', display: 'inline-block', marginRight: 8, verticalAlign: 'middle' }} />
                   {cat.name}
                 </button>
               ))}

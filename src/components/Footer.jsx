@@ -1,9 +1,13 @@
 import { Link } from 'react-router-dom'
 import { useProducts } from '../context/ProductContext'
+import { useSiteContent } from '../context/SiteContentContext'
 import './Footer.css'
 
 export default function Footer() {
   const { categories } = useProducts()
+  const { content } = useSiteContent()
+  const f = content.footer
+
   return (
     <footer className="footer">
       <div className="container">
@@ -14,13 +18,11 @@ export default function Footer() {
               <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Nalam Vaazha" className="footer__logo-img" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
               <span className="footer__logo-name" style={{ display: 'none' }}>Nalam <span>Vaazha</span></span>
             </Link>
-            <p className="footer__tagline">
-              தினந்தோறும் ஆரோக்கியம். Authentic homemade health & wellness products delivered fresh to your doorstep.
-            </p>
+            <p className="footer__tagline">{f.tagline}</p>
             <div className="footer__social">
-              <a href="#" className="footer__social-btn" aria-label="Instagram">📸</a>
-              <a href="#" className="footer__social-btn" aria-label="Facebook">👍</a>
-              <a href="https://wa.me/918778836682" className="footer__social-btn" aria-label="WhatsApp" target="_blank" rel="noreferrer">💬</a>
+              <a href={f.instagramUrl} className="footer__social-btn" aria-label="Instagram" target="_blank" rel="noreferrer">📸</a>
+              <a href={f.facebookUrl} className="footer__social-btn" aria-label="Facebook" target="_blank" rel="noreferrer">👍</a>
+              <a href={f.whatsappUrl} className="footer__social-btn" aria-label="WhatsApp" target="_blank" rel="noreferrer">💬</a>
             </div>
           </div>
 
@@ -30,9 +32,7 @@ export default function Footer() {
             <ul className="footer__links">
               {categories && categories.map(cat => (
                 <li key={cat.slug || cat._id}>
-                  <Link to={`/shop/${cat.slug}`} className="footer__link">
-                    {cat.name}
-                  </Link>
+                  <Link to={`/shop/${cat.slug}`} className="footer__link">{cat.name}</Link>
                 </li>
               ))}
             </ul>
@@ -54,17 +54,17 @@ export default function Footer() {
           <div className="footer__col">
             <h4 className="footer__heading">Contact</h4>
             <ul className="footer__contact-list">
-              <li>📞 +91 99999 99999</li>
-              <li>📧 hello@nalamvaazha.in</li>
-              <li>📍 Chennai, Tamil Nadu</li>
-              <li>⏰ Mon–Sat, 9am–7pm</li>
+              <li>📞 {f.phone}</li>
+              <li>📧 {f.email}</li>
+              <li>📍 {f.location}</li>
+              <li>⏰ {f.hours}</li>
             </ul>
           </div>
         </div>
 
         <div className="footer__bottom">
-          <p>© {new Date().getFullYear()} Nalam Vaazha (நலம் வாழ). Made with ❤️ for daily health.</p>
-          <p>All products are freshly made at home with natural ingredients.</p>
+          <p>&copy; {new Date().getFullYear()} Nalam Vaazha (நலம் வாழ). Made with ❤️ for daily health.</p>
+          <p>{f.copyrightExtra}</p>
         </div>
       </div>
     </footer>

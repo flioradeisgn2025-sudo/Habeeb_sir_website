@@ -1,44 +1,83 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
+import { useSiteContent } from '../context/SiteContentContext'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import './CartPage.css'
 
+const DEFAULT_WA_TEMPLATE = `🛒 *NEW ORDER — NALAM VAAZHA*
+━━━━━━━━━━━━━━━━━━━
+
+👤 *Customer Details:*
+Name: {{name}}
+Phone: {{phone}}
+Address: {{address}}
+{{#notes}}Notes: {{notes}}{{/notes}}
+
+📦 *Order Items:*
+━━━━━━━━━━━━━━━━━━━
+{{items}}
+━━━━━━━━━━━━━━━━━━━
+
+💰 *Subtotal:* ₹{{subtotal}}
+{{#deliveryCharge}}🚚 *Delivery Charge:* ₹{{deliveryCharge}}{{/deliveryCharge}}
+━━━━━━━━━━━━━━━━━━━
+🧾 *Grand Total:* ₹{{grandTotal}}
+━━━━━━━━━━━━━━━━━━━
+
+📅 Order Date: {{date}}
+🆔 Order ID: {{orderId}}
+
+Thank you for ordering! 🙏`
+
+function buildWhatsAppMessage(template, data) {
+  let msg = template
+  // Handle conditional sections {{#field}}...{{/field}}
+  msg = msg.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, field, content) => {
+    return data[field] ? content.replace(new RegExp(`\\{\\{${field}\\}\\}`, 'g'), data[field]) : ''
+  })
+  // Replace remaining placeholders
+  Object.entries(data).forEach(([key, val]) => {
+    msg = msg.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), val)
+  })
+  return msg
+}
+
 export default function CartPage() {
   const { items, removeItem, updateQty, totalPrice, totalItems, clearCart } = useCart()
+  const { content } = useSiteContent()
+  const cartContent = content.cart
   const navigate = useNavigate()
-  
+
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [whatsappLink, setWhatsappLink] = useState(null)
   const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    address: '',
-    notes: ''
+    name: '', phone: '', address: '', notes: ''
   })
 
   const [deliveryCharge, setDeliveryCharge] = useState(0)
   const [adminWhatsAppNumber, setAdminWhatsAppNumber] = useState('918778836682')
+  const [waTemplate, setWaTemplate] = useState(DEFAULT_WA_TEMPLATE)
 
   useEffect(() => {
-    // Load from localStorage first
     try {
       const local = localStorage.getItem('nalamvaazha_settings')
       if (local) {
         const parsed = JSON.parse(local)
         setDeliveryCharge(Number(parsed.deliveryCharge) || 0)
         setAdminWhatsAppNumber(parsed.whatsappNumber || '918778836682')
+        if (parsed.waTemplate) setWaTemplate(parsed.waTemplate)
       }
     } catch {}
 
-    // Then try API
     axios.get('/api/settings', { timeout: 1000 })
       .then(res => {
         const s = res.data.data
         setDeliveryCharge(Number(s.deliveryCharge) || 0)
         setAdminWhatsAppNumber(s.whatsappNumber || '918778836682')
+        if (s.waTemplate) setWaTemplate(s.waTemplate)
       })
       .catch(() => {})
   }, [])
@@ -50,14 +89,13 @@ export default function CartPage() {
     if (items.length === 0) return
 
     if (!formData.name || !formData.phone || !formData.address) {
-      toast.error('Please fill all required fields');
-      return;
+      toast.error('Please fill all required fields')
+      return
     }
 
     setLoading(true)
 
     try {
-      // 1. Save to Database
       const orderPayload = {
         customer: formData,
         items: items.map(item => ({
@@ -72,56 +110,45 @@ export default function CartPage() {
         grandTotal
       }
 
-      let orderId = 'ORD-' + Math.floor(10000 + Math.random() * 90000);
+      let orderId = 'ORD-' + Math.floor(10000 + Math.random() * 90000)
       try {
         const res = await axios.post('/api/orders', orderPayload)
-        orderId = res.data.data.orderId;
-      } catch (dbError) {
-        console.warn('MongoDB backend offline. Bypassing DB save and proceeding manually.');
+        orderId = res.data.data.orderId
+      } catch {
+        console.warn('MongoDB backend offline. Bypassing DB save.')
       }
 
-      // 2. Generate WhatsApp Message
-      let message = `🛒 *NEW ORDER — NALAM VAAZHA*\n━━━━━━━━━━━━━━━━━━━\n\n`
-      message += `👤 *Customer Details:*\n`
-      message += `Name: ${formData.name}\n`
-      message += `Phone: ${formData.phone}\n`
-      message += `Address: ${formData.address}\n`
-      if (formData.notes) message += `Notes: ${formData.notes}\n`
-      
-      message += `\n📦 *Order Items:*\n━━━━━━━━━━━━━━━━━━━\n`
-      items.forEach((item, index) => {
-        message += `${index + 1}. *${item.name}* × ${item.qty} — ₹${item.price * item.qty}\n`
+      // Build items text
+      const itemsText = items.map((item, index) =>
+        `${index + 1}. *${item.name}* × ${item.qty} — ₹${item.price * item.qty}`
+      ).join('\n')
+
+      const message = buildWhatsAppMessage(waTemplate, {
+        name: formData.name,
+        phone: formData.phone,
+        address: formData.address,
+        notes: formData.notes,
+        items: itemsText,
+        subtotal: String(totalPrice),
+        deliveryCharge: deliveryCharge > 0 ? String(deliveryCharge) : '',
+        grandTotal: String(grandTotal),
+        date: new Date().toLocaleString(),
+        orderId,
       })
-      message += `━━━━━━━━━━━━━━━━━━━\n`
-      
-      message += `💰 *Subtotal:* ₹${totalPrice}\n`
-      if (deliveryCharge > 0) message += `🚚 *Delivery Charge:* ₹${deliveryCharge}\n`
-      message += `━━━━━━━━━━━━━━━━━━━\n`
-      message += `🧾 *Grand Total:* ₹${grandTotal}\n`
-      message += `━━━━━━━━━━━━━━━━━━━\n\n`
-      
-      message += `📅 Order Date: ${new Date().toLocaleString()}\n`
-      message += `🆔 Order ID: ${orderId}\n\n`
-      message += `Thank you for ordering! 🙏`
 
       const encoded = encodeURIComponent(message)
       const whatsappUrl = `https://wa.me/${adminWhatsAppNumber}?text=${encoded}`
 
-      // 3. Open WhatsApp immediately (direct user action context avoids popup blocker)
       const opened = window.open(whatsappUrl, '_blank')
-
-      // 4. Clear cart and show success
       clearCart()
 
       if (!opened) {
-        // Popup was blocked — show the link so user can tap it
         setWhatsappLink(whatsappUrl)
         toast.error('Popup blocked! Please tap the WhatsApp button below to send your order.')
       } else {
         toast.success('Order placed! Check WhatsApp to send your order message.')
         navigate('/')
       }
-
     } catch (error) {
       console.error(error)
       toast.error('Failed to submit order. Please try again.')
@@ -169,14 +196,13 @@ export default function CartPage() {
       <header className="page-hero">
         <div className="container">
           <span className="badge badge-saffron">{totalItems} Items</span>
-          <h1>Review Your <span className="text-gradient">Order</span></h1>
-          <p>You're just one step away from authentic homemade goodness.</p>
+          <h1>{cartContent.heroTitle.split(' ').slice(0, -1).join(' ')} <span className="text-gradient">{cartContent.heroTitle.split(' ').slice(-1)}</span></h1>
+          <p>{cartContent.heroSubtitle}</p>
         </div>
       </header>
 
       <section className="section container">
         <div className="cart-grid">
-          {/* Main List */}
           <div className="cart-list">
             <div className="cart-header-labels">
               <span>Product</span>
@@ -184,7 +210,7 @@ export default function CartPage() {
               <span>Quantity</span>
               <span>Total</span>
             </div>
-            
+
             <div className="cart-items-wrap">
               {items.map(item => (
                 <div key={item.id} className="cart-page-item">
@@ -210,11 +236,10 @@ export default function CartPage() {
                 </div>
               ))}
             </div>
-            
+
             <Link to="/shop" className="continue-shop-link">← Continue Shopping</Link>
           </div>
 
-          {/* Sidebar Summary & Form */}
           <aside className="cart-summary glass-card">
             <h3>Order Summary</h3>
             <div className="summary-rows">
@@ -233,7 +258,7 @@ export default function CartPage() {
                 <span>₹{grandTotal}</span>
               </div>
             </div>
-            
+
             {!showForm ? (
               <>
                 <button className="btn btn-whatsapp btn-lg w-full whatsapp-order-btn" onClick={() => setShowForm(true)}>
@@ -243,23 +268,23 @@ export default function CartPage() {
               </>
             ) : (
               <form className="checkout-form animate-fade-in" onSubmit={handleOrderSubmit}>
-                <h4 style={{marginTop: '20px', marginBottom: '16px', borderTop: '1px solid var(--border-light)', paddingTop: '20px'}}>Delivery Details</h4>
-                <div className="form-group" style={{marginBottom: '12px'}}>
+                <h4 style={{marginTop: 20, marginBottom: 16, borderTop: '1px solid var(--border-light)', paddingTop: 20}}>Delivery Details</h4>
+                <div className="form-group" style={{marginBottom: 12}}>
                   <input type="text" className="form-input" placeholder="Full Name *" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
                 </div>
-                <div className="form-group" style={{marginBottom: '12px'}}>
+                <div className="form-group" style={{marginBottom: 12}}>
                   <input type="tel" className="form-input" placeholder="Phone Number *" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} required />
                 </div>
-                <div className="form-group" style={{marginBottom: '12px'}}>
+                <div className="form-group" style={{marginBottom: 12}}>
                   <textarea className="form-textarea" placeholder="Complete Delivery Address *" rows={3} value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} required></textarea>
                 </div>
-                <div className="form-group" style={{marginBottom: '16px'}}>
+                <div className="form-group" style={{marginBottom: 16}}>
                   <textarea className="form-textarea" placeholder="Special Instructions (Optional)" rows={2} value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})}></textarea>
                 </div>
                 <button type="submit" disabled={loading} className="btn btn-whatsapp btn-lg w-full whatsapp-order-btn p-static">
                   {loading ? 'Processing...' : 'Place Order & Open WhatsApp'}
                 </button>
-                <button type="button" className="btn btn-ghost w-full" style={{marginTop: '8px'}} onClick={() => setShowForm(false)}>
+                <button type="button" className="btn btn-ghost w-full" style={{marginTop: 8}} onClick={() => setShowForm(false)}>
                   Cancel
                 </button>
               </form>

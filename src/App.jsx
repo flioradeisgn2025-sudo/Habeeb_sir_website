@@ -2,6 +2,7 @@ import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-d
 import { useEffect, useState } from 'react'
 import { CartProvider } from './context/CartContext'
 import { ProductProvider, useProducts } from './context/ProductContext'
+import { SiteContentProvider } from './context/SiteContentContext'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 
@@ -14,6 +15,7 @@ import AboutUsPage from './pages/AboutUsPage'
 import FAQPage from './pages/FAQPage'
 import ContactUsPage from './pages/ContactUsPage'
 import AdminPage from './pages/AdminPage'
+import ProductDetailPage from './pages/ProductDetailPage'
 
 // Scroll to top on route change
 function ScrollToTop() {
@@ -58,6 +60,7 @@ function AppContent() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/shop" element={<ShopPage />} />
               <Route path="/shop/:categoryId" element={<CategoryPage />} />
+              <Route path="/product/:productId" element={<ProductDetailPage />} />
               <Route path="/cart" element={<CartPage />} />
               <Route path="/about" element={<AboutUsPage />} />
               <Route path="/faq" element={<FAQPage />} />
@@ -76,7 +79,9 @@ function App() {
   return (
     <ProductProvider>
       <CartProvider>
-        <AppContent />
+        <SiteContentProvider>
+          <AppContent />
+        </SiteContentProvider>
       </CartProvider>
     </ProductProvider>
   )

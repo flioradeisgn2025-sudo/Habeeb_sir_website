@@ -1,4 +1,9 @@
+import { useSiteContent } from '../context/SiteContentContext'
+
 export default function ContactUsPage() {
+  const { content } = useSiteContent()
+  const c = content.contact
+
   const handleSubmit = (e) => {
     e.preventDefault()
     alert('Thank you for your message! We will get back to you soon.')
@@ -8,9 +13,9 @@ export default function ContactUsPage() {
     <div className="contact-page">
       <header className="page-hero">
         <div className="container">
-          <span className="badge badge-saffron">Support</span>
-          <h1>Get in <span className="text-gradient">Touch</span></h1>
-          <p>We'd love to hear from you! Reach out for orders, queries or feedback.</p>
+          <span className="badge badge-saffron">{c.badge}</span>
+          <h1>{c.heroTitle.split(' ').slice(0, -1).join(' ')} <span className="text-gradient">{c.heroTitle.split(' ').slice(-1)}</span></h1>
+          <p>{c.heroSubtitle}</p>
         </div>
       </header>
 
@@ -20,29 +25,37 @@ export default function ContactUsPage() {
           <div className="contact-info animate-fade-in-up">
             <h2 style={{ marginBottom: '24px' }}>Contact <span className="text-gradient">Information</span></h2>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '40px' }}>Feel free to contact us through any of these channels. We typically respond within a few hours.</p>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
               <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
                 <span style={{ fontSize: '24px' }}>📞</span>
                 <div>
                   <h4 style={{ fontWeight: '700' }}>Phone / WhatsApp</h4>
-                  <p style={{ color: 'var(--text-secondary)' }}>+91 99999 99999</p>
+                  <p style={{ color: 'var(--text-secondary)' }}>{c.phone}</p>
                 </div>
               </div>
-              
+
               <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
                 <span style={{ fontSize: '24px' }}>📧</span>
                 <div>
                   <h4 style={{ fontWeight: '700' }}>Email Address</h4>
-                  <p style={{ color: 'var(--text-secondary)' }}>hello@nalamvaazha.in</p>
+                  <p style={{ color: 'var(--text-secondary)' }}>{c.email}</p>
                 </div>
               </div>
-              
+
               <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
                 <span style={{ fontSize: '24px' }}>📍</span>
                 <div>
                   <h4 style={{ fontWeight: '700' }}>Our Location</h4>
-                  <p style={{ color: 'var(--text-secondary)' }}>123 Traditional St, Mylapore,<br />Chennai, Tamil Nadu - 600004</p>
+                  <p style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-line' }}>{c.address}</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '24px' }}>⏰</span>
+                <div>
+                  <h4 style={{ fontWeight: '700' }}>Working Hours</h4>
+                  <p style={{ color: 'var(--text-secondary)' }}>{c.hours}</p>
                 </div>
               </div>
             </div>

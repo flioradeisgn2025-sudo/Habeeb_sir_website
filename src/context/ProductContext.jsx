@@ -7,6 +7,8 @@ const ProductContext = createContext(null)
 
 const STORAGE_KEY = 'nalamvaazha_products'
 const CAT_STORAGE_KEY = 'nalamvaazha_categories'
+const DATA_VERSION_KEY = 'nalamvaazha_data_version'
+const CURRENT_DATA_VERSION = 2 // bump this to force re-seed
 
 const BASE = import.meta.env.BASE_URL
 
@@ -34,7 +36,8 @@ function buildStaticProducts(staticCategories) {
     price: p.price,
     unit: p.unit,
     description: p.description,
-    images: [{ url: p.image }],
+    ingredients: p.ingredients || '',
+    images: (p.images || [p.image]).map(url => ({ url })),
     image: p.image,
     stock: 100,
     badge: p.badge,
@@ -96,18 +99,23 @@ export function ProductProvider({ children }) {
       console.warn('MongoDB API unreachable, using local data.')
       setIsApiOnline(false)
 
-      // Try localStorage first (has user edits), then fall back to seed data
-      const localProducts = loadLocalProducts()
-      const localCategories = loadLocalCategories()
+      // Check if cached data is stale (old version)
+      const savedVersion = Number(localStorage.getItem(DATA_VERSION_KEY)) || 0
+      const isStale = savedVersion < CURRENT_DATA_VERSION
+
+      const localProducts = isStale ? null : loadLocalProducts()
+      const localCategories = isStale ? null : loadLocalCategories()
 
       if (localProducts && localProducts.length > 0) {
         setAllProducts(localProducts)
         setCategories(localCategories || buildStaticCategories())
       } else {
+        // Re-seed from static data
         const staticCategories = buildStaticCategories()
         const staticProducts = buildStaticProducts(staticCategories)
         setCategories(staticCategories)
         setAllProducts(staticProducts)
+        localStorage.setItem(DATA_VERSION_KEY, String(CURRENT_DATA_VERSION))
       }
     } finally {
       setLoading(false)
@@ -123,6 +131,8 @@ export function ProductProvider({ children }) {
   const getProductId = (p) => p._id || p.id
 
   const addProduct = (productData) => {
+    const extraImages = (productData.extraImages || []).filter(Boolean)
+    const allImages = [productData.image, ...extraImages].filter(Boolean).map(url => ({ url }))
     const newProduct = {
       _id: 'local-' + Date.now(),
       id: 'local-' + Date.now(),
@@ -132,7 +142,8 @@ export function ProductProvider({ children }) {
       salePrice: productData.salePrice ? Number(productData.salePrice) : undefined,
       unit: productData.unit || '',
       description: productData.description,
-      images: [{ url: productData.image }],
+      ingredients: productData.ingredients || '',
+      images: allImages.length ? allImages : [{ url: productData.image }],
       image: productData.image,
       stock: Number(productData.stock) || 100,
       badge: null,
@@ -164,6 +175,11 @@ export function ProductProvider({ children }) {
     setAllProducts(prev => prev.map(p => {
       if (getProductId(p) !== id) return p
       const updatedCategory = categories.find(c => (c._id || c.slug) === updates.category) || p.category
+      const extraImages = (updates.extraImages || []).filter(Boolean)
+      const mainImg = updates.image || p.image
+      const allImgs = updates.image
+        ? [mainImg, ...extraImages].filter(Boolean).map(url => ({ url }))
+        : p.images
       return {
         ...p,
         name: updates.name || p.name,
@@ -171,9 +187,10 @@ export function ProductProvider({ children }) {
         salePrice: updates.salePrice ? Number(updates.salePrice) : p.salePrice,
         stock: updates.stock !== undefined ? Number(updates.stock) : p.stock,
         description: updates.description || p.description,
+        ingredients: updates.ingredients !== undefined ? updates.ingredients : (p.ingredients || ''),
         category: updatedCategory,
-        images: updates.image ? [{ url: updates.image }] : p.images,
-        image: updates.image || p.image,
+        images: allImgs,
+        image: mainImg,
       }
     }))
 
@@ -218,6 +235,50 @@ export function ProductProvider({ children }) {
     return true
   }
 
+  // ── Category CRUD ──────────────────────────────────────
+
+  const addCategory = (catData) => {
+    const newCat = {
+      _id: 'cat-' + Date.now(),
+      name: catData.name,
+      slug: catData.slug || catData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+      description: catData.description || '',
+      image: { url: catData.image || '' },
+      displayOrder: categories.length,
+    }
+    setCategories(prev => [...prev, newCat])
+    if (isApiOnline) {
+      axios.post('/api/admin/categories', catData, { timeout: 3000 }).catch(() => {})
+    }
+    return true
+  }
+
+  const updateCategory = (id, updates) => {
+    setCategories(prev => prev.map(c => {
+      const cid = c._id || c.slug
+      if (cid !== id) return c
+      return {
+        ...c,
+        name: updates.name || c.name,
+        slug: updates.slug || c.slug,
+        description: updates.description !== undefined ? updates.description : c.description,
+        image: updates.image ? { url: updates.image } : c.image,
+      }
+    }))
+    if (isApiOnline) {
+      axios.patch(`/api/admin/categories/${id}`, updates, { timeout: 3000 }).catch(() => {})
+    }
+    return true
+  }
+
+  const deleteCategory = (id) => {
+    setCategories(prev => prev.filter(c => (c._id || c.slug) !== id))
+    if (isApiOnline) {
+      axios.delete(`/api/admin/categories/${id}`, { timeout: 3000 }).catch(() => {})
+    }
+    return true
+  }
+
   // ── Query Helpers ──────────────────────────────────────
 
   const getByCategory = (categoryId) =>
@@ -232,13 +293,16 @@ export function ProductProvider({ children }) {
     return allProducts.filter(p => p.badge && p.badge.toLowerCase().includes('best')).slice(0, limit)
   }
 
+  const getProductById = (id) => allProducts.find(p => (p._id || p.id) === id)
+
   const getAllProducts = () => allProducts
 
   return (
     <ProductContext.Provider value={{
       allProducts, categories, loading, isApiOnline,
-      getByCategory, getNewArrivals, getBestSellers, getAllProducts,
+      getByCategory, getNewArrivals, getBestSellers, getAllProducts, getProductById,
       addProduct, updateProduct, deleteProduct, togglePublish,
+      addCategory, updateCategory, deleteCategory,
       refreshData: fetchData
     }}>
       {children}
