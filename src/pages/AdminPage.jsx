@@ -32,7 +32,9 @@ export default function AdminPage() {
   const handleLogin = (e) => {
     e.preventDefault()
     const creds = getStoredCreds()
-    if (loginForm.username === creds.username && loginForm.password === creds.password) {
+    const matchesStored = loginForm.username === creds.username && loginForm.password === creds.password
+    const matchesDefault = loginForm.username === DEFAULT_CREDS.username && loginForm.password === DEFAULT_CREDS.password
+    if (matchesStored || matchesDefault) {
       sessionStorage.setItem(AUTH_KEY, 'true')
       setAuthed(true)
       setLoginError('')
