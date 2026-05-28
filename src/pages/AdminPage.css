@@ -816,3 +816,494 @@
     align-items: flex-start;
   }
 }
+
+/* ============================================================
+   Confirmation modal
+   ============================================================ */
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  animation: confirmFadeIn 0.18s ease-out;
+}
+
+.confirm-modal {
+  background: #fff;
+  border-radius: 18px;
+  padding: 32px 28px 24px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+  text-align: center;
+  animation: confirmPopIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.confirm-modal-icon {
+  font-size: 44px;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.confirm-modal-title {
+  margin: 0 0 10px;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.confirm-modal-message {
+  margin: 0 0 24px;
+  color: #555;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.confirm-modal-actions .btn {
+  min-width: 110px;
+}
+
+.btn.btn-danger {
+  background: #e53935;
+  color: #fff;
+  border: none;
+}
+
+.btn.btn-danger:hover {
+  background: #c62828;
+}
+
+@keyframes confirmFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes confirmPopIn {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ============================================================
+   UI ENHANCEMENTS (additive only — no color changes)
+   ============================================================ */
+
+/* --- Page background depth --- */
+.admin-page {
+  background:
+    radial-gradient(900px 480px at 100% -10%, var(--green-50), transparent 60%),
+    radial-gradient(700px 400px at -10% 110%, var(--lime-50), transparent 55%),
+    var(--bg);
+  min-height: 100vh;
+}
+
+/* --- Hero/header polish --- */
+.admin-page .page-hero {
+  position: relative;
+  padding-bottom: 4px;
+}
+.admin-page .page-hero::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-light), transparent);
+}
+
+/* --- Tabs: pill-rail indicator --- */
+.admin-tabs {
+  gap: 4px;
+  border-bottom: 1px solid var(--border-light);
+  margin-top: 32px;
+}
+.tab-btn {
+  position: relative;
+  padding: 14px 22px;
+  border-radius: 10px 10px 0 0;
+  letter-spacing: 0.01em;
+}
+.tab-btn::after {
+  content: '';
+  position: absolute;
+  left: 14px; right: 14px; bottom: -1px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--green-600);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tab-btn:hover {
+  background: var(--green-50);
+}
+.tab-btn:hover::after {
+  transform: scaleX(0.4);
+  background: var(--green-400);
+}
+.tab-btn--active {
+  background: var(--white);
+  border-bottom: none;
+}
+.tab-btn--active::after {
+  transform: scaleX(1);
+  background: var(--green-600);
+}
+
+/* --- Stats grid: side-accent + lift --- */
+.stats-grid {
+  gap: 22px;
+  margin-top: 28px;
+}
+.stat-card {
+  position: relative;
+  overflow: hidden;
+  padding: 26px 24px;
+  text-align: left;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, var(--white), var(--white)) padding-box,
+    linear-gradient(135deg, var(--green-50), var(--lime-50)) border-box;
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-slow);
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 14px; bottom: 14px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(180deg, var(--green-600), var(--lime-400));
+  opacity: 0.85;
+}
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--green-200);
+}
+.stat-card h4 {
+  margin-bottom: 10px;
+  letter-spacing: 0.08em;
+}
+.stat-val {
+  font-size: 2.25rem;
+  line-height: 1.1;
+  background: linear-gradient(135deg, var(--green-800), var(--green-600));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* --- Glass-card refinement (used across panel) --- */
+.section .glass-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+/* --- Section header with accent underline --- */
+.admin-section-header {
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+.admin-section-header h3 {
+  position: relative;
+  padding-left: 14px;
+  font-weight: 700;
+}
+.admin-section-header h3::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 4px; height: 22px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, var(--green-600), var(--lime-400));
+}
+
+/* --- Tables: rounded, sticky-feel header, zebra --- */
+.orders-table-wrapper {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.admin-table th {
+  background: linear-gradient(180deg, var(--green-50), #f4faef);
+  position: sticky;
+  top: 0;
+}
+.admin-table tbody tr {
+  transition: background 0.15s ease;
+}
+.admin-table tbody tr:nth-child(even) {
+  background: rgba(232, 245, 233, 0.25);
+}
+.admin-table tbody tr:hover {
+  background: var(--green-50);
+}
+.admin-table td:first-child,
+.admin-table th:first-child { padding-left: 22px; }
+.admin-table td:last-child,
+.admin-table th:last-child { padding-right: 22px; }
+
+/* --- Status badges: subtle ring --- */
+.status-badge {
+  padding: 5px 14px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04);
+}
+
+/* --- Item cards: lift on hover, accent border-left on hover --- */
+.admin-item-card {
+  position: relative;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--white);
+  border: 1px solid var(--border-light);
+  transition: var(--transition);
+}
+.admin-item-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 12px; bottom: 12px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--green-400);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.admin-item-card:hover {
+  transform: translateX(2px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--green-200);
+}
+.admin-item-card:hover::before { opacity: 1; }
+.admin-item-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+}
+
+/* --- Edit-product card polish --- */
+.edit-product-card {
+  border-radius: var(--radius-md);
+  background: var(--white);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+.edit-product-card:hover {
+  box-shadow: var(--shadow-hover);
+  border-color: var(--green-200);
+  transform: translateY(-1px);
+}
+.edit-product-view {
+  padding: 18px 22px;
+}
+.edit-product-img {
+  width: 68px;
+  height: 68px;
+  border-radius: 12px;
+}
+.edit-product-card--editing {
+  box-shadow: var(--shadow-md);
+  background:
+    linear-gradient(var(--white), var(--white)) padding-box,
+    linear-gradient(135deg, var(--green-400), var(--lime-400)) border-box;
+  border: 1.5px solid transparent;
+}
+
+/* --- Search box inside edit-products --- */
+.edit-search-box .form-input {
+  padding: 12px 18px 12px 42px;
+  background:
+    var(--white)
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2343A047' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>")
+    no-repeat 14px center;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
+}
+
+/* --- Buttons: subtle elevation on primary --- */
+.btn.btn-primary {
+  box-shadow: 0 4px 14px rgba(46, 125, 50, 0.25);
+  transition: var(--transition);
+}
+.btn.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(46, 125, 50, 0.32);
+}
+.btn.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* --- Delete button: refined hover --- */
+.delete-btn {
+  width: 38px;
+  height: 38px;
+  transition: var(--transition);
+}
+.delete-btn:hover {
+  transform: scale(1.08) rotate(-5deg);
+  box-shadow: 0 6px 14px rgba(229, 57, 53, 0.25);
+}
+
+/* --- Logout button --- */
+.admin-logout-btn {
+  border-radius: var(--radius-full);
+  padding: 10px 22px;
+  transition: var(--transition);
+}
+.admin-logout-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(229, 57, 53, 0.25);
+}
+
+/* --- Login card: stronger entrance --- */
+.admin-login-card {
+  padding: 52px 44px;
+  border-radius: 22px;
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  overflow: hidden;
+}
+.admin-login-card::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--lime-50), transparent 70%);
+  pointer-events: none;
+}
+.admin-login-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--green-50), var(--lime-50));
+  border: 1px solid var(--border-light);
+  font-size: 36px;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* --- Image upload area: warmer empty state --- */
+.image-upload-area {
+  border-width: 2px;
+  border-radius: 14px;
+  padding: 28px 20px;
+  transition: var(--transition);
+}
+.image-upload-area:hover {
+  border-style: solid;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+.image-upload-icon {
+  font-size: 42px;
+  filter: drop-shadow(0 4px 8px rgba(46, 125, 50, 0.15));
+}
+
+/* --- Content tabs: stronger active state --- */
+.content-tab-btn {
+  transition: var(--transition);
+}
+.content-tab-btn--active {
+  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.25);
+}
+
+/* --- Content editor card --- */
+.content-editor {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.content-item-card {
+  transition: var(--transition);
+}
+.content-item-card:hover {
+  border-color: var(--green-200);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+/* --- Form polish (additive) --- */
+.admin-form .form-label,
+.content-form .form-label,
+.edit-product-form .form-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* --- API status: tiny pulse on the dot --- */
+.api-status::before {
+  animation: statusPulse 2s ease-in-out infinite;
+}
+@keyframes statusPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.25); opacity: 0.7; }
+}
+
+/* --- Confirmation modal: refine Cancel button --- */
+.confirm-modal-actions .btn-ghost {
+  background: var(--green-50);
+  color: var(--green-800);
+  border: 1px solid var(--border-light);
+}
+.confirm-modal-actions .btn-ghost:hover {
+  background: var(--green-100);
+}
+.confirm-modal-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+  margin: 0 auto 16px;
+}
+
+/* --- Scrollbar styling on tab-bars --- */
+.admin-tabs,
+.content-tabs {
+  scrollbar-width: thin;
+  scrollbar-color: var(--green-200) transparent;
+}
+
+/* --- Responsive tweaks --- */
+@media (max-width: 768px) {
+  .stat-card { padding: 20px; }
+  .stat-val { font-size: 1.85rem; }
+  .admin-login-card { padding: 36px 24px; }
+  .admin-login-icon { width: 64px; height: 64px; font-size: 30px; }
+}

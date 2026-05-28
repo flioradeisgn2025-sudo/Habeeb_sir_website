@@ -138,6 +138,11 @@ function AdminDashboard({ onLogout }) {
   // Site content editing
   const [contentTab, setContentTab] = useState('hero')
 
+  // Confirmation modal
+  const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', onConfirm: null })
+  const askConfirm = (title, message, onConfirm) => setConfirmModal({ open: true, title, message, onConfirm })
+  const closeConfirm = () => setConfirmModal({ open: false, title: '', message: '', onConfirm: null })
+
   const getProductId = (p) => p._id || p.id
 
   // Image file to base64
@@ -265,11 +270,18 @@ function AdminDashboard({ onLogout }) {
 
   // ── Handlers ──────────────────────────────────────
 
-  const handleDeleteProduct = async (id) => {
-    if (!window.confirm('Delete this product?')) return
-    const success = await deleteProduct(id)
-    if (success) toast.success('Product deleted')
-    else toast.error('Delete failed')
+  const handleDeleteProduct = (id) => {
+    const product = products.find(p => getProductId(p) === id)
+    askConfirm(
+      'Delete product?',
+      `Are you sure you want to delete "${product?.name || 'this product'}"? This action cannot be undone.`,
+      async () => {
+        const success = await deleteProduct(id)
+        if (success) toast.success('Product deleted')
+        else toast.error('Delete failed')
+        closeConfirm()
+      }
+    )
   }
 
   const handleUpload = async (e) => {
@@ -372,12 +384,16 @@ function AdminDashboard({ onLogout }) {
   }
 
   const handleDeleteCategory = (id) => {
+    const cat = categories.find(c => (c._id || c.slug) === id)
     const catProducts = products.filter(p => (p.category?._id || p.category?.slug) === id)
-    if (catProducts.length > 0) {
-      if (!window.confirm(`This category has ${catProducts.length} products. Delete anyway?`)) return
-    }
-    deleteCategory(id)
-    toast.success('Category deleted')
+    const message = catProducts.length > 0
+      ? `This category has ${catProducts.length} product(s). Deleting it will not delete the products, but they may become uncategorised. Continue?`
+      : `Are you sure you want to delete the category "${cat?.name || ''}"? This action cannot be undone.`
+    askConfirm('Delete category?', message, () => {
+      deleteCategory(id)
+      toast.success('Category deleted')
+      closeConfirm()
+    })
   }
 
   // ── Image Upload Component ──────────────────────────
@@ -1213,6 +1229,20 @@ function AdminDashboard({ onLogout }) {
         {activeTab === 'site content' && renderSiteContent()}
         {activeTab === 'settings' && renderSettings()}
       </section>
+
+      {confirmModal.open && (
+        <div className="confirm-modal-overlay" onClick={closeConfirm}>
+          <div className="confirm-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="confirm-modal-icon">⚠️</div>
+            <h3 className="confirm-modal-title">{confirmModal.title}</h3>
+            <p className="confirm-modal-message">{confirmModal.message}</p>
+            <div className="confirm-modal-actions">
+              <button className="btn btn-ghost" onClick={closeConfirm}>Cancel</button>
+              <button className="btn btn-danger" onClick={() => confirmModal.onConfirm && confirmModal.onConfirm()}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

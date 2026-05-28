@@ -85,38 +85,52 @@ export function ProductProvider({ children }) {
   }, [categories])
 
   const fetchData = useCallback(async () => {
+    setLoading(true)
+
+    // localStorage is the source of truth for admin edits — only seed from
+    // API/static on a fresh browser where no local data exists yet.
+    const savedVersion = Number(localStorage.getItem(DATA_VERSION_KEY)) || 0
+    const isStale = savedVersion < CURRENT_DATA_VERSION
+    const localProducts = isStale ? null : loadLocalProducts()
+    const localCategories = isStale ? null : loadLocalCategories()
+
+    if (localProducts && localProducts.length > 0) {
+      setAllProducts(localProducts)
+      setCategories(localCategories || buildStaticCategories())
+      // Ping API in the background just to flag online status (no data overwrite)
+      axios.get('/api/products', { timeout: 1500 })
+        .then(() => setIsApiOnline(true))
+        .catch(() => setIsApiOnline(false))
+      setLoading(false)
+      return
+    }
+
     try {
-      setLoading(true)
       const [productsRes, categoriesRes] = await Promise.all([
-        axios.get('/api/products', { timeout: 1000 }),
-        axios.get('/api/categories', { timeout: 1000 })
+        axios.get('/api/products', { timeout: 1500 }),
+        axios.get('/api/categories', { timeout: 1500 })
       ])
-
-      setAllProducts(productsRes.data.data)
-      setCategories(categoriesRes.data.data)
+      const apiProducts = productsRes.data.data || []
+      const apiCategories = categoriesRes.data.data || []
       setIsApiOnline(true)
-    } catch {
-      console.warn('MongoDB API unreachable, using local data.')
-      setIsApiOnline(false)
 
-      // Check if cached data is stale (old version)
-      const savedVersion = Number(localStorage.getItem(DATA_VERSION_KEY)) || 0
-      const isStale = savedVersion < CURRENT_DATA_VERSION
-
-      const localProducts = isStale ? null : loadLocalProducts()
-      const localCategories = isStale ? null : loadLocalCategories()
-
-      if (localProducts && localProducts.length > 0) {
-        setAllProducts(localProducts)
-        setCategories(localCategories || buildStaticCategories())
+      if (apiProducts.length > 0) {
+        setAllProducts(apiProducts)
+        setCategories(apiCategories.length ? apiCategories : buildStaticCategories())
+        localStorage.setItem(DATA_VERSION_KEY, String(CURRENT_DATA_VERSION))
       } else {
-        // Re-seed from static data
         const staticCategories = buildStaticCategories()
-        const staticProducts = buildStaticProducts(staticCategories)
         setCategories(staticCategories)
-        setAllProducts(staticProducts)
+        setAllProducts(buildStaticProducts(staticCategories))
         localStorage.setItem(DATA_VERSION_KEY, String(CURRENT_DATA_VERSION))
       }
+    } catch {
+      console.warn('MongoDB API unreachable, seeding from static data.')
+      setIsApiOnline(false)
+      const staticCategories = buildStaticCategories()
+      setCategories(staticCategories)
+      setAllProducts(buildStaticProducts(staticCategories))
+      localStorage.setItem(DATA_VERSION_KEY, String(CURRENT_DATA_VERSION))
     } finally {
       setLoading(false)
     }

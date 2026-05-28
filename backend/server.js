@@ -10,7 +10,7 @@ const connectDB = require('./config/db');
 dotenv.config();
 
 // Connect to database
-// connectDB(); // Uncomment when MONGODB_URI is provided
+connectDB();
 
 const app = express();
 
