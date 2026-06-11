@@ -10,8 +10,8 @@ exports.getSettings = asyncHandler(async (req, res) => {
   if (!settings) {
     // Return default settings if none exist
     settings = {
-      businessName: 'My Homemade Store',
-      whatsappNumber: '919999999999', // Placeholder
+      businessName: 'Nalam Vaazha',
+      whatsappNumber: '918778836682',
       deliveryCharge: 0,
       currencySymbol: '₹',
     };

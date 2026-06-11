@@ -2,47 +2,9 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useSiteContent } from '../context/SiteContentContext'
-import axios from 'axios'
+import { loadOrderSettings, placeOrder } from '../lib/checkout'
 import toast from 'react-hot-toast'
 import './CartPage.css'
-
-const DEFAULT_WA_TEMPLATE = `🛒 *NEW ORDER — NALAM VAAZHA*
-━━━━━━━━━━━━━━━━━━━
-
-👤 *Customer Details:*
-Name: {{name}}
-Phone: {{phone}}
-Address: {{address}}
-{{#notes}}Notes: {{notes}}{{/notes}}
-
-📦 *Order Items:*
-━━━━━━━━━━━━━━━━━━━
-{{items}}
-━━━━━━━━━━━━━━━━━━━
-
-💰 *Subtotal:* ₹{{subtotal}}
-{{#deliveryCharge}}🚚 *Delivery Charge:* ₹{{deliveryCharge}}{{/deliveryCharge}}
-━━━━━━━━━━━━━━━━━━━
-🧾 *Grand Total:* ₹{{grandTotal}}
-━━━━━━━━━━━━━━━━━━━
-
-📅 Order Date: {{date}}
-🆔 Order ID: {{orderId}}
-
-Thank you for ordering! 🙏`
-
-function buildWhatsAppMessage(template, data) {
-  let msg = template
-  // Handle conditional sections {{#field}}...{{/field}}
-  msg = msg.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, field, content) => {
-    return data[field] ? content.replace(new RegExp(`\\{\\{${field}\\}\\}`, 'g'), data[field]) : ''
-  })
-  // Replace remaining placeholders
-  Object.entries(data).forEach(([key, val]) => {
-    msg = msg.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), val)
-  })
-  return msg
-}
 
 export default function CartPage() {
   const { items, removeItem, updateQty, totalPrice, totalItems, clearCart } = useCart()
@@ -57,29 +19,11 @@ export default function CartPage() {
     name: '', phone: '', address: '', notes: ''
   })
 
-  const [deliveryCharge, setDeliveryCharge] = useState(0)
-  const [adminWhatsAppNumber, setAdminWhatsAppNumber] = useState('918778836682')
-  const [waTemplate, setWaTemplate] = useState(DEFAULT_WA_TEMPLATE)
+  const [settings, setSettings] = useState({ deliveryCharge: 0, whatsappNumber: '', waTemplate: '' })
+  const deliveryCharge = settings.deliveryCharge || 0
 
   useEffect(() => {
-    try {
-      const local = localStorage.getItem('nalamvaazha_settings')
-      if (local) {
-        const parsed = JSON.parse(local)
-        setDeliveryCharge(Number(parsed.deliveryCharge) || 0)
-        setAdminWhatsAppNumber(parsed.whatsappNumber || '918778836682')
-        if (parsed.waTemplate) setWaTemplate(parsed.waTemplate)
-      }
-    } catch {}
-
-    axios.get('/api/settings', { timeout: 1000 })
-      .then(res => {
-        const s = res.data.data
-        setDeliveryCharge(Number(s.deliveryCharge) || 0)
-        setAdminWhatsAppNumber(s.whatsappNumber || '918778836682')
-        if (s.waTemplate) setWaTemplate(s.waTemplate)
-      })
-      .catch(() => {})
+    loadOrderSettings().then(setSettings)
   }, [])
 
   const grandTotal = totalPrice + deliveryCharge
@@ -96,48 +40,13 @@ export default function CartPage() {
     setLoading(true)
 
     try {
-      const orderPayload = {
+      const { whatsappUrl } = await placeOrder({
+        items,
         customer: formData,
-        items: items.map(item => ({
-          product: item._id || item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.qty,
-          lineTotal: item.price * item.qty
-        })),
-        subtotal: totalPrice,
         deliveryCharge,
-        grandTotal
-      }
-
-      let orderId = 'ORD-' + Math.floor(10000 + Math.random() * 90000)
-      try {
-        const res = await axios.post('/api/orders', orderPayload)
-        orderId = res.data.data.orderId
-      } catch {
-        console.warn('MongoDB backend offline. Bypassing DB save.')
-      }
-
-      // Build items text
-      const itemsText = items.map((item, index) =>
-        `${index + 1}. *${item.name}* × ${item.qty} — ₹${item.price * item.qty}`
-      ).join('\n')
-
-      const message = buildWhatsAppMessage(waTemplate, {
-        name: formData.name,
-        phone: formData.phone,
-        address: formData.address,
-        notes: formData.notes,
-        items: itemsText,
-        subtotal: String(totalPrice),
-        deliveryCharge: deliveryCharge > 0 ? String(deliveryCharge) : '',
-        grandTotal: String(grandTotal),
-        date: new Date().toLocaleString(),
-        orderId,
+        whatsappNumber: settings.whatsappNumber,
+        waTemplate: settings.waTemplate,
       })
-
-      const encoded = encodeURIComponent(message)
-      const whatsappUrl = `https://wa.me/${adminWhatsAppNumber}?text=${encoded}`
 
       const opened = window.open(whatsappUrl, '_blank')
       clearCart()

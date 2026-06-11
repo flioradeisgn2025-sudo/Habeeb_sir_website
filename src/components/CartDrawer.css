@@ -52,9 +52,88 @@
   font-size: 22px;
 }
 
+.cart-drawer__title-icon {
+  font-size: 22px;
+}
+
 .cart-drawer__title h2 {
   font-size: 20px;
   font-weight: 700;
+}
+
+.cart-drawer__back {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--green-50);
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--green-800);
+  transition: var(--transition-fast);
+}
+
+.cart-drawer__back:hover {
+  background: var(--green-100);
+}
+
+/* Step indicator */
+.cart-steps {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 32px 6px;
+  background: var(--white);
+  position: relative;
+}
+
+.cart-steps__dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--green-50);
+  border: 1.5px solid var(--border-medium);
+  color: var(--text-hint);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cart-steps__dot.is-active {
+  background: var(--green-600);
+  border-color: var(--green-600);
+  color: #fff;
+}
+
+.cart-steps__dot.is-done {
+  background: var(--lime-400);
+  border-color: var(--lime-400);
+  color: var(--green-900);
+}
+
+.cart-steps__line {
+  height: 2px;
+  background: var(--border-light);
+}
+
+.cart-steps__labels {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-hint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .cart-drawer__close {
@@ -266,19 +345,112 @@
   border-top: 1px dashed var(--border-medium);
 }
 
-.cart-drawer__whatsapp-btn {
+/* Checkout button (cart stage) */
+.cart-drawer__checkout {
   width: 100%;
-  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
-  box-shadow: 0 8px 24px rgba(37,211,102,0.3);
+  padding: 14px;
+  border-radius: var(--radius-full);
+  background: var(--green-600);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
 }
 
-.cart-drawer__whatsapp-btn:hover {
-  box-shadow: 0 12px 32px rgba(37,211,102,0.45);
+.cart-drawer__checkout:hover {
+  background: var(--green-700);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
-.cart-drawer__view-btn {
+/* WhatsApp order button (details stage) */
+.cart-drawer__whatsapp {
   width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius-full);
+  background: var(--wa-green);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 0 8px 24px rgba(37, 211, 102, 0.3);
+}
+
+.cart-drawer__whatsapp:hover {
+  background: var(--wa-hover);
+  box-shadow: 0 12px 32px rgba(37, 211, 102, 0.45);
+}
+
+.cart-drawer__whatsapp:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.cart-drawer__note {
+  font-size: 12px;
+  color: var(--text-hint);
   text-align: center;
+}
+
+/* Details form */
+.cart-details {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 8px 24px 16px;
+}
+
+.cart-details__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cart-details__field label {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cart-details__field input,
+.cart-details__field textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--surface);
+  outline: none;
+  transition: var(--transition-fast);
+  resize: vertical;
+}
+
+.cart-details__field input:focus,
+.cart-details__field textarea:focus {
+  border-color: var(--green-600);
+  box-shadow: 0 0 0 4px var(--green-50);
+}
+
+.cart-details__fallback {
+  display: block;
+  text-align: center;
+  padding: 13px;
+  border-radius: var(--radius-sm);
+  background: var(--wa-green);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
 }
 
 .cart-drawer__clear {

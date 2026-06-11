@@ -18,7 +18,7 @@ export function CartProvider({ children }) {
     localStorage.setItem('nalamvaazha_cart', JSON.stringify(items))
   }, [items])
 
-  const addItem = (product) => {
+  const addItem = (product, { openDrawer = true } = {}) => {
     const pid = product.id || product._id
 
     // Build a lightweight cart item — no base64 images or nested objects
@@ -48,6 +48,9 @@ export function CartProvider({ children }) {
         qty: 1
       }]
     })
+
+    // Slide the mini-cart open so checkout is one continuous flow
+    if (openDrawer) setIsOpen(true)
   }
 
   const removeItem = (id) => {

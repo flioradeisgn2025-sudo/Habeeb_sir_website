@@ -76,6 +76,15 @@
 }
 
 /* ============================================================
+   Sticky header stack (announcement + navbar)
+   ============================================================ */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+/* ============================================================
    Reset & Base
    ============================================================ */
 *, *::before, *::after {
@@ -329,7 +338,7 @@ h1, h2, h3, h4, h5, h6 {
    ============================================================ */
 .page-hero {
   background: var(--green-50);
-  padding: 120px 0 48px;
+  padding: 56px 0 48px;
   color: var(--green-800);
   position: relative;
   overflow: hidden;
@@ -348,6 +357,38 @@ h1, h2, h3, h4, h5, h6 {
   margin-top: 16px;
   max-width: 600px;
   line-height: 1.7;
+}
+
+/* ============================================================
+   Section header (shared across pages)
+   ============================================================ */
+.section-header {
+  margin-bottom: 28px;
+}
+
+.section-header__top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.section-header h2 {
+  font-size: 2.2rem;
+  margin-bottom: 12px;
+  color: var(--green-900);
+}
+
+.section-header p {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
+
+@media (max-width: 768px) {
+  .section-header__top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 /* ============================================================
@@ -487,13 +528,13 @@ h1, h2, h3, h4, h5, h6 {
    ============================================================ */
 .products-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 24px;
 }
 
 @media (max-width: 1024px) {
   .products-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -505,14 +546,14 @@ h1, h2, h3, h4, h5, h6 {
     padding: 48px 0;
   }
   .products-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
   }
 }
 
 @media (max-width: 480px) {
   .products-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
 }
@@ -547,6 +588,39 @@ h1, h2, h3, h4, h5, h6 {
   animation: loaderSpin 0.7s linear infinite;
 }
 
+/* Branded mark: rotating ring + pulsing leaf */
+.page-loader__mark {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-loader__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 4px solid var(--green-100);
+  border-top-color: var(--green-600);
+  border-right-color: var(--lime-400);
+  animation: loaderSpin 0.8s linear infinite;
+}
+
+.page-loader__leaf {
+  font-size: 28px;
+  animation: loaderPulse 1.1s ease-in-out infinite;
+}
+
+.page-loader__brand {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--green-800);
+}
+
 .page-loader__text {
   font-family: var(--font-body);
   font-size: 15px;
@@ -554,8 +628,35 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--green-700);
 }
 
+.page-loader__bar {
+  width: 160px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--green-100);
+  overflow: hidden;
+}
+
+.page-loader__bar span {
+  display: block;
+  height: 100%;
+  width: 40%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--green-600), var(--lime-400));
+  animation: loaderSlide 1.1s ease-in-out infinite;
+}
+
 @keyframes loaderSpin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes loaderPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.18); opacity: 0.8; }
+}
+
+@keyframes loaderSlide {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(360%); }
 }
 
 /* Button loading state */
@@ -616,4 +717,61 @@ h1, h2, h3, h4, h5, h6 {
 
 .skeleton-loading {
   animation: pulseSkeleton 1.5s infinite;
+}
+
+/* ============================================================
+   Responsive safety net — keep every page within the viewport
+   ============================================================ */
+
+/* Never let media/SVG/tables force horizontal scroll */
+img, svg, video, canvas, table { max-width: 100%; }
+
+/* Inline-style grids on Contact / About don't collapse on their own —
+   override them (CSS !important beats inline styles). */
+@media (max-width: 860px) {
+  .contact-grid,
+  .about-content {
+    grid-template-columns: 1fr !important;
+    gap: 36px !important;
+  }
+  .contact-form-wrap {
+    padding: 28px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-hero {
+    padding: 40px 0 36px;
+  }
+  .page-hero h1 {
+    font-size: clamp(1.8rem, 7vw, 2.6rem);
+  }
+  .section-header h2 {
+    font-size: 1.7rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .about-stats {
+    gap: 24px !important;
+    flex-wrap: wrap;
+  }
+  .about-stats h3 {
+    font-size: 2rem !important;
+  }
+  /* Tame oversized inline heading sizes on the smallest screens */
+  .about-page h2[style],
+  .contact-page h2[style] {
+    font-size: 1.7rem !important;
+  }
+  .btn-lg {
+    padding: 14px 28px;
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 400px) {
+  .container {
+    padding: 0 14px;
+  }
 }

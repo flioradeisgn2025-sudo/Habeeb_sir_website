@@ -5,6 +5,33 @@ const SiteContentContext = createContext(null)
 const STORAGE_KEY = 'nalamvaazha_sitecontent'
 
 const DEFAULT_CONTENT = {
+  announcement: {
+    enabled: true,
+    text: '🎉 Free delivery on orders above ₹500 — Fresh homemade goodness delivered to your door!',
+    link: '/shop',
+  },
+  offerBanners: [
+    {
+      id: 'ob-1',
+      title: 'Festive Combo Packs',
+      subtitle: 'Save up to 20% on curated hampers',
+      cta: 'Shop Offers',
+      image: 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=900&q=80',
+      link: '/shop',
+      theme: 'green',
+      enabled: true,
+    },
+    {
+      id: 'ob-2',
+      title: 'New: Curry Leaf Podi',
+      subtitle: 'Iron-rich, stone-ground, freshly packed',
+      cta: 'Try It Now',
+      image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=900&q=80',
+      link: '/shop/podis',
+      theme: 'lime',
+      enabled: true,
+    },
+  ],
   hero: {
     badge: 'தினந்தோறும் ஆரோக்கியம்',
     titleLine1: 'GOOD 🌿 TASTE.',

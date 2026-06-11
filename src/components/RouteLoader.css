@@ -1,0 +1,131 @@
+/* ── Top progress bar (NProgress-style) ── */
+.route-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 0;
+  z-index: 4000;
+  background: linear-gradient(90deg, var(--green-600), var(--lime-400));
+  box-shadow: 0 0 10px rgba(212, 237, 33, 0.6);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.route-bar--loading {
+  opacity: 1;
+  width: 85%;
+  transition: width 0.5s cubic-bezier(0.1, 0.6, 0.3, 1);
+}
+
+.route-bar--done {
+  opacity: 1;
+  width: 100%;
+  transition: width 0.18s ease;
+}
+
+.route-bar--idle {
+  opacity: 0;
+  width: 100%;
+  transition: opacity 0.3s ease 0.05s;
+}
+
+/* ── Branded spinner overlay ── */
+.route-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 3900;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background:
+    radial-gradient(600px 360px at 50% 42%, rgba(232, 245, 233, 0.9), transparent 70%),
+    rgba(250, 255, 245, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.route-loader--show {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* The animated mark: rotating ring + pulsing leaf */
+.route-loader__mark {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.route-loader__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid var(--green-100);
+  border-top-color: var(--green-600);
+  border-right-color: var(--lime-400);
+  animation: route-spin 0.8s linear infinite;
+}
+
+.route-loader__dot {
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: var(--green-50);
+  box-shadow: inset 0 0 0 1px var(--border-light);
+}
+
+.route-loader__leaf {
+  position: relative;
+  font-size: 24px;
+  animation: route-pulse 1.1s ease-in-out infinite;
+}
+
+.route-loader__text {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--green-800);
+  position: relative;
+}
+
+.route-loader__text::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, var(--lime-400), transparent);
+  animation: route-sweep 1.1s ease-in-out infinite;
+}
+
+@keyframes route-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes route-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.18); opacity: 0.8; }
+}
+
+@keyframes route-sweep {
+  0% { transform: translateX(-60%); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateX(60%); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-loader__ring { animation-duration: 1.6s; }
+  .route-loader__leaf,
+  .route-loader__text::after { animation: none; }
+}

@@ -18,7 +18,7 @@ export default function Navbar() {
 
   const navLinks = [
     { to: '/', label: 'Home' },
-    { to: '/shop', label: 'Shop' },
+    { to: '/shop', label: 'Shop', tag: 'HOT' },
     { to: '/about', label: 'About' },
     { to: '/faq', label: 'FAQ' },
     { to: '/contact', label: 'Contact' },
@@ -48,12 +48,23 @@ export default function Navbar() {
                 }
               >
                 {link.label}
+                {link.tag && <span className="navbar__link-tag">{link.tag}</span>}
               </NavLink>
             ))}
           </nav>
 
           {/* Right side */}
           <div className="navbar__actions">
+            <button
+              className="navbar__search-btn"
+              onClick={() => navigate('/shop')}
+              aria-label="Search products"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z" />
+              </svg>
+            </button>
+
             <button
               className="navbar__cart-btn"
               onClick={() => setIsOpen(true)}

@@ -3,8 +3,19 @@ import { useEffect, useState } from 'react'
 import { CartProvider } from './context/CartContext'
 import { ProductProvider, useProducts } from './context/ProductContext'
 import { SiteContentProvider } from './context/SiteContentContext'
+import { installAuthInterceptors, clearSession } from './lib/adminAuth'
 import Navbar from './components/Navbar'
+import AnnouncementBar from './components/AnnouncementBar'
 import Footer from './components/Footer'
+import RouteLoader from './components/RouteLoader'
+
+// Attach the admin bearer token to requests and auto-logout on 401
+installAuthInterceptors(() => {
+  clearSession()
+  if (window.location.pathname.startsWith('/admin')) {
+    window.location.reload()
+  }
+})
 
 // Pages
 import LandingPage from './pages/LandingPage'
@@ -41,8 +52,12 @@ function PageLoader() {
 
   return (
     <div className={`page-loader ${!loading ? 'page-loader--hidden' : ''}`}>
-      <div className="page-loader__spinner" />
-      <p className="page-loader__text">Loading Nalam Vaazha...</p>
+      <div className="page-loader__mark">
+        <span className="page-loader__ring" />
+        <span className="page-loader__leaf">🌿</span>
+      </div>
+      <p className="page-loader__brand">Nalam Vaazha</p>
+      <div className="page-loader__bar"><span /></div>
     </div>
   )
 }
@@ -53,8 +68,12 @@ function AppContent() {
       <PageLoader />
       <Router>
         <ScrollToTop />
+        <RouteLoader />
         <div className="app-container">
-          <Navbar />
+          <div className="site-header">
+            <AnnouncementBar />
+            <Navbar />
+          </div>
           <main className="content-wrap">
             <Routes>
               <Route path="/" element={<LandingPage />} />

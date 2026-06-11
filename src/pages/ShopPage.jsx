@@ -1,15 +1,27 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useProducts } from '../context/ProductContext'
 import { useSiteContent } from '../context/SiteContentContext'
 import ProductCard from '../components/ProductCard'
+import { ProductSkeletonGrid } from '../components/ProductCardSkeleton'
 import './ShopPage.css'
 
 export default function ShopPage() {
-  const { allProducts, categories } = useProducts()
+  const { allProducts, categories, loading } = useProducts()
   const { content } = useSiteContent()
   const shop = content.shop
   const [activeCategory, setActiveCategory] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const navigate = useNavigate()
+
+  const handleSearch = (value) => {
+    // Hidden shortcut: typing /admin in the search opens the admin panel
+    if (value.trim().toLowerCase() === '/admin') {
+      navigate('/admin')
+      return
+    }
+    setSearchQuery(value)
+  }
 
   const filteredProducts = useMemo(() => {
     return allProducts.filter(p => {
@@ -40,7 +52,7 @@ export default function ShopPage() {
                 type="text"
                 placeholder="Search products..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearch(e.target.value)}
               />
             </div>
 
@@ -70,7 +82,11 @@ export default function ShopPage() {
           </div>
 
           {/* Grid */}
-          {filteredProducts.length > 0 ? (
+          {loading ? (
+            <div className="products-grid">
+              <ProductSkeletonGrid count={8} />
+            </div>
+          ) : filteredProducts.length > 0 ? (
             <div className="products-grid animate-fade-in">
               {filteredProducts.map(product => (
                 <ProductCard key={product.id} product={product} />

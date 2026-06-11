@@ -1,9 +1,5 @@
 .navbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
+  position: static;
   padding: 10px 0;
   transition: var(--transition);
   background: var(--white);
@@ -59,6 +55,7 @@
 }
 
 .navbar__link {
+  position: relative;
   padding: 8px 16px;
   border-radius: var(--radius-full);
   font-family: var(--font-body);
@@ -67,6 +64,21 @@
   transition: var(--transition-fast);
   color: var(--green-900);
   text-decoration: none;
+}
+
+.navbar__link-tag {
+  position: absolute;
+  top: -7px;
+  right: -8px;
+  background: var(--lime-400);
+  color: var(--green-900);
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 2px 8px rgba(27, 94, 32, 0.18);
+  pointer-events: none;
 }
 
 .navbar__link:hover {
@@ -85,6 +97,25 @@
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.navbar__search-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--green-50);
+  border: 1px solid var(--border-light);
+  color: var(--green-800);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.navbar__search-btn:hover {
+  background: var(--green-100);
+  transform: scale(1.05);
 }
 
 .navbar__cart-btn {
@@ -202,5 +233,8 @@
   }
   .navbar__hamburger {
     display: flex;
+  }
+  .navbar__search-btn {
+    display: none;
   }
 }

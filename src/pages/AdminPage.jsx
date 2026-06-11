@@ -3,48 +3,37 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import { useProducts } from '../context/ProductContext'
 import { useSiteContent } from '../context/SiteContentContext'
+import { login as apiLogin, changeCredentials, clearSession, getAdminUser, getToken, setSession, isAuthed } from '../lib/adminAuth'
+import ImageUpload from '../components/admin/ImageUpload'
+import AnalyticsDashboard from './admin/AnalyticsDashboard'
+import HomeBannersTab from './admin/HomeBannersTab'
+import Loader from '../components/Loader'
 import './AdminPage.css'
 
-const AUTH_KEY = 'nalamvaazha_admin_auth'
-const CREDS_KEY = 'nalamvaazha_admin_creds'
-
-const DEFAULT_CREDS = { username: 'admin', password: 'admin123' }
-
-function getStoredCreds() {
-  try {
-    const saved = localStorage.getItem(CREDS_KEY)
-    return saved ? JSON.parse(saved) : DEFAULT_CREDS
-  } catch { return DEFAULT_CREDS }
-}
-
-function isLoggedIn() {
-  try {
-    const sess = sessionStorage.getItem(AUTH_KEY)
-    return sess === 'true'
-  } catch { return false }
-}
-
 export default function AdminPage() {
-  const [authed, setAuthed] = useState(isLoggedIn)
+  const [authed, setAuthed] = useState(isAuthed)
   const [loginForm, setLoginForm] = useState({ username: '', password: '' })
   const [loginError, setLoginError] = useState('')
+  const [loggingIn, setLoggingIn] = useState(false)
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
-    const creds = getStoredCreds()
-    const matchesStored = loginForm.username === creds.username && loginForm.password === creds.password
-    const matchesDefault = loginForm.username === DEFAULT_CREDS.username && loginForm.password === DEFAULT_CREDS.password
-    if (matchesStored || matchesDefault) {
-      sessionStorage.setItem(AUTH_KEY, 'true')
+    setLoggingIn(true)
+    setLoginError('')
+    try {
+      await apiLogin(loginForm.username.trim(), loginForm.password)
       setAuthed(true)
-      setLoginError('')
-    } else {
-      setLoginError('Invalid username or password')
+    } catch (err) {
+      const msg = err?.response?.data?.message
+        || (err?.code === 'ERR_NETWORK' ? 'Cannot reach server. Make sure the backend is running.' : 'Invalid username or password')
+      setLoginError(msg)
+    } finally {
+      setLoggingIn(false)
     }
   }
 
   const handleLogout = () => {
-    sessionStorage.removeItem(AUTH_KEY)
+    clearSession()
     setAuthed(false)
     setLoginForm({ username: '', password: '' })
   }
@@ -88,8 +77,8 @@ export default function AdminPage() {
                 />
               </div>
               {loginError && <p className="admin-login-error">{loginError}</p>}
-              <button type="submit" className="btn btn-primary w-full" style={{ marginTop: 8 }}>
-                Log In
+              <button type="submit" className="btn btn-primary w-full" style={{ marginTop: 8 }} disabled={loggingIn}>
+                {loggingIn ? 'Logging in…' : 'Log In'}
               </button>
             </form>
           </div>
@@ -113,9 +102,20 @@ function AdminDashboard({ onLogout }) {
 
   const [activeTab, setActiveTab] = useState('dashboard')
   const [orders, setOrders] = useState([])
+  const [orderDetail, setOrderDetail] = useState(null)
+  const [dataLoading, setDataLoading] = useState(true)
+  const [tabLoading, setTabLoading] = useState(false)
+
+  // Show a brief loader whenever the admin switches tabs
+  const switchTab = (key) => {
+    if (key === activeTab) return
+    setActiveTab(key)
+    setTabLoading(true)
+    setTimeout(() => setTabLoading(false), 350)
+  }
 
   // Credential change
-  const [credForm, setCredForm] = useState({ username: '', password: '', confirmPassword: '' })
+  const [credForm, setCredForm] = useState({ currentPassword: '', username: '', password: '', confirmPassword: '' })
 
   // Product form
   const [prodForm, setProdForm] = useState({
@@ -181,9 +181,10 @@ function AdminDashboard({ onLogout }) {
     } catch {}
 
     const fetchAdminData = async () => {
+      setDataLoading(true)
       const results = await Promise.allSettled([
-        axios.get('/api/admin/orders', { timeout: 1000 }),
-        axios.get('/api/settings', { timeout: 1000 })
+        axios.get('/api/admin/orders', { timeout: 4000 }),
+        axios.get('/api/settings', { timeout: 4000 })
       ])
       if (results[0].status === 'fulfilled') setOrders(results[0].value.data.data)
       if (results[1].status === 'fulfilled') {
@@ -194,6 +195,7 @@ function AdminDashboard({ onLogout }) {
           deliveryCharge: apiSettings.deliveryCharge || 0
         })
       }
+      setDataLoading(false)
     }
     fetchAdminData()
   }, [])
@@ -340,23 +342,37 @@ function AdminDashboard({ onLogout }) {
     axios.put('/api/admin/settings', sData, { timeout: 1000 }).catch(() => {})
   }
 
-  const handleChangeCredentials = (e) => {
+  const handleChangeCredentials = async (e) => {
     e.preventDefault()
-    if (!credForm.username || !credForm.password) {
-      toast.error('Username and password are required')
+    if (!credForm.currentPassword) {
+      toast.error('Enter your current password to confirm changes')
       return
     }
-    if (credForm.password !== credForm.confirmPassword) {
+    if (!credForm.username && !credForm.password) {
+      toast.error('Enter a new username and/or new password')
+      return
+    }
+    if (credForm.password && credForm.password !== credForm.confirmPassword) {
       toast.error('Passwords do not match')
       return
     }
-    if (credForm.password.length < 4) {
-      toast.error('Password must be at least 4 characters')
+    if (credForm.password && credForm.password.length < 6) {
+      toast.error('Password must be at least 6 characters')
       return
     }
-    localStorage.setItem(CREDS_KEY, JSON.stringify({ username: credForm.username, password: credForm.password }))
-    toast.success('Admin credentials updated! Use new credentials on next login.')
-    setCredForm({ username: '', password: '', confirmPassword: '' })
+    try {
+      const data = await changeCredentials({
+        currentPassword: credForm.currentPassword,
+        newUsername: credForm.username || undefined,
+        newPassword: credForm.password || undefined,
+      })
+      // Reflect the server's authoritative (lowercased) username in the UI
+      if (data?.username) setSession(getToken(), data.username)
+      toast.success('Admin credentials updated! Use the new credentials next time you log in.')
+      setCredForm({ currentPassword: '', username: '', password: '', confirmPassword: '' })
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Could not update credentials')
+    }
   }
 
   // Category handlers
@@ -398,53 +414,9 @@ function AdminDashboard({ onLogout }) {
     })
   }
 
-  // ── Image Upload Component ──────────────────────────
-  const ImageUpload = ({ value, onChange, id, small }) => (
-    <div
-      className={`image-upload-area ${small ? 'image-upload-area--sm' : ''}`}
-      onDragOver={e => e.preventDefault()}
-      onDrop={e => {
-        e.preventDefault()
-        e.stopPropagation()
-        const file = e.dataTransfer?.files?.[0]
-        if (file && file.type.startsWith('image/')) {
-          if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return }
-          const reader = new FileReader()
-          reader.onload = (ev) => onChange(ev.target.result)
-          reader.readAsDataURL(file)
-        }
-      }}
-      onClick={() => document.getElementById(id).click()}
-    >
-      {value ? (
-        <div className={`image-upload-preview ${small ? 'image-upload-preview--sm' : ''}`}>
-          <img src={value} alt="Preview" />
-          <button type="button" className="image-upload-remove" onClick={e => { e.stopPropagation(); onChange('') }}>
-            {small ? 'Change' : 'Remove'}
-          </button>
-        </div>
-      ) : (
-        <div className="image-upload-placeholder">
-          <span className="image-upload-icon">📷</span>
-          <p>Click to upload or drag & drop</p>
-          <span className="image-upload-hint">PNG, JPG up to 5MB — or paste a URL</span>
-        </div>
-      )}
-      <input id={id} type="file" accept="image/*" hidden onChange={e => {
-        const file = e.target.files[0]
-        if (!file) return
-        if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return }
-        const reader = new FileReader()
-        reader.onload = (ev) => onChange(ev.target.result)
-        reader.readAsDataURL(file)
-      }} />
-    </div>
-  )
-
   // ── Render Sections ──────────────────────────────────────
 
   const renderDashboard = () => {
-    const monthlyData = getMonthlyReport()
     return (
       <div className="admin-dashboard animate-fade-in">
         <div className="admin-status-bar">
@@ -452,79 +424,17 @@ function AdminDashboard({ onLogout }) {
             {isApiOnline ? 'Backend Online' : 'Offline Mode (Local Data)'}
           </span>
         </div>
-        <h3>Overview</h3>
-        <div className="stats-grid">
-          <div className="stat-card glass-card">
-            <h4>Total Products</h4>
-            <span className="stat-val">{stats.totalProducts}</span>
-          </div>
-          <div className="stat-card glass-card">
-            <h4>Categories</h4>
-            <span className="stat-val">{stats.totalCategories}</span>
-          </div>
-          <div className="stat-card glass-card">
-            <h4>Total Orders</h4>
-            <span className="stat-val">{stats.totalOrders}</span>
-          </div>
-          <div className="stat-card glass-card">
-            <h4>Total Revenue</h4>
-            <span className="stat-val">₹{stats.totalRevenue.toLocaleString()}</span>
-          </div>
-          <div className="stat-card glass-card">
-            <h4>Pending Orders</h4>
-            <span className="stat-val text-warning">{stats.pendingOrders}</span>
-          </div>
-          <div className="stat-card glass-card">
-            <h4>Delivered</h4>
-            <span className="stat-val text-success">{stats.deliveredOrders}</span>
-          </div>
-          <div className="stat-card glass-card">
-            <h4>Cancelled</h4>
-            <span className="stat-val text-error">{stats.cancelledOrders}</span>
-          </div>
-          <div className="stat-card glass-card">
-            <h4>Out of Stock</h4>
-            <span className="stat-val text-error">{stats.outOfStock}</span>
-          </div>
-        </div>
 
-        {/* Monthly Report */}
-        <div className="admin-section-header" style={{ marginTop: 40 }}>
-          <h3>Monthly Report</h3>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-sm btn-secondary" onClick={downloadMonthlyReport}>Download Monthly CSV</button>
-            <button className="btn btn-sm btn-primary" onClick={downloadAllOrders}>Download All Orders CSV</button>
-          </div>
-        </div>
-        {monthlyData.length > 0 ? (
-          <div className="orders-table-wrapper glass-card" style={{ marginTop: 16 }}>
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Month</th>
-                  <th>Orders</th>
-                  <th>Revenue</th>
-                  <th>Delivered</th>
-                  <th>Pending</th>
-                  <th>Cancelled</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monthlyData.map(m => (
-                  <tr key={m.month}>
-                    <td><strong>{m.month}</strong></td>
-                    <td>{m.orders}</td>
-                    <td>₹{m.revenue.toLocaleString()}</td>
-                    <td className="text-success">{m.delivered}</td>
-                    <td className="text-warning">{m.pending}</td>
-                    <td className="text-error">{m.cancelled}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {dataLoading ? (
+          <Loader label="Loading your dashboard…" />
         ) : (
-          <div className="empty-state-small" style={{ marginTop: 16 }}>No order data for reports yet.</div>
+          <AnalyticsDashboard
+            orders={orders}
+            products={products}
+            onExportMonthly={downloadMonthlyReport}
+            onExportAll={downloadAllOrders}
+            onGotoOrders={() => switchTab('orders')}
+          />
         )}
 
         <h3 style={{ marginTop: 40 }}>Recent Orders</h3>
@@ -829,7 +739,7 @@ function AdminDashboard({ onLogout }) {
                     </select>
                   </td>
                   <td>
-                    <button className="btn btn-ghost btn-sm" onClick={() => alert(JSON.stringify(order.items, null, 2))}>Details</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setOrderDetail(order)}>Details</button>
                   </td>
                 </tr>
               ))}
@@ -1165,21 +1075,25 @@ function AdminDashboard({ onLogout }) {
       <div className="upload-section glass-card" style={{ maxWidth: 700, margin: '40px auto 0' }}>
         <h3>Change Admin Credentials</h3>
         <p style={{ fontSize: 13, color: 'var(--text-hint)', marginBottom: 20 }}>
-          Update your admin login username and password. Current username: <strong>{getStoredCreds().username}</strong>
+          Update your admin login. Logged in as: <strong>{getAdminUser() || 'admin'}</strong>. Leave a field blank to keep it unchanged.
         </p>
         <form className="admin-form" onSubmit={handleChangeCredentials}>
           <div className="form-group">
+            <label className="form-label">Current Password *</label>
+            <input type="password" className="form-input" value={credForm.currentPassword} onChange={e => setCredForm({...credForm, currentPassword: e.target.value})} placeholder="Confirm it's you" required autoComplete="current-password" />
+          </div>
+          <div className="form-group">
             <label className="form-label">New Username</label>
-            <input type="text" className="form-input" value={credForm.username} onChange={e => setCredForm({...credForm, username: e.target.value})} placeholder="Enter new username" required autoComplete="off" />
+            <input type="text" className="form-input" value={credForm.username} onChange={e => setCredForm({...credForm, username: e.target.value})} placeholder="Leave blank to keep current" autoComplete="off" />
           </div>
           <div className="flex-group">
             <div className="form-group">
               <label className="form-label">New Password</label>
-              <input type="password" className="form-input" value={credForm.password} onChange={e => setCredForm({...credForm, password: e.target.value})} placeholder="Min 4 characters" required autoComplete="new-password" />
+              <input type="password" className="form-input" value={credForm.password} onChange={e => setCredForm({...credForm, password: e.target.value})} placeholder="Min 6 characters" autoComplete="new-password" />
             </div>
             <div className="form-group">
               <label className="form-label">Confirm Password</label>
-              <input type="password" className="form-input" value={credForm.confirmPassword} onChange={e => setCredForm({...credForm, confirmPassword: e.target.value})} placeholder="Re-enter password" required autoComplete="new-password" />
+              <input type="password" className="form-input" value={credForm.confirmPassword} onChange={e => setCredForm({...credForm, confirmPassword: e.target.value})} placeholder="Re-enter password" autoComplete="new-password" />
             </div>
           </div>
           <button type="submit" className="btn btn-primary w-full">Update Credentials</button>
@@ -1194,6 +1108,7 @@ function AdminDashboard({ onLogout }) {
     { key: 'edit products', label: 'Edit Products' },
     { key: 'categories', label: 'Categories' },
     { key: 'orders', label: 'Orders' },
+    { key: 'home banners', label: 'Home & Banners' },
     { key: 'site content', label: 'Site Content' },
     { key: 'settings', label: 'Settings' },
   ]
@@ -1214,7 +1129,7 @@ function AdminDashboard({ onLogout }) {
 
           <div className="admin-tabs">
             {TABS.map(tab => (
-              <button key={tab.key} className={`tab-btn ${activeTab === tab.key ? 'tab-btn--active' : ''}`} onClick={() => setActiveTab(tab.key)}>
+              <button key={tab.key} className={`tab-btn ${activeTab === tab.key ? 'tab-btn--active' : ''}`} onClick={() => switchTab(tab.key)}>
                 {tab.label}
               </button>
             ))}
@@ -1223,13 +1138,20 @@ function AdminDashboard({ onLogout }) {
       </header>
 
       <section className="section container" style={{ paddingTop: 40 }}>
-        {activeTab === 'dashboard' && renderDashboard()}
-        {activeTab === 'products' && renderProducts()}
-        {activeTab === 'edit products' && renderEditProducts()}
-        {activeTab === 'categories' && renderCategories()}
-        {activeTab === 'orders' && renderOrders()}
-        {activeTab === 'site content' && renderSiteContent()}
-        {activeTab === 'settings' && renderSettings()}
+        {tabLoading ? (
+          <Loader label="Loading…" />
+        ) : (
+          <>
+            {activeTab === 'dashboard' && renderDashboard()}
+            {activeTab === 'products' && renderProducts()}
+            {activeTab === 'edit products' && renderEditProducts()}
+            {activeTab === 'categories' && renderCategories()}
+            {activeTab === 'orders' && renderOrders()}
+            {activeTab === 'home banners' && <HomeBannersTab content={content} updateSection={updateSection} />}
+            {activeTab === 'site content' && renderSiteContent()}
+            {activeTab === 'settings' && renderSettings()}
+          </>
+        )}
       </section>
 
       {confirmModal.open && (
@@ -1241,6 +1163,54 @@ function AdminDashboard({ onLogout }) {
             <div className="confirm-modal-actions">
               <button className="btn btn-ghost" onClick={closeConfirm}>Cancel</button>
               <button className="btn btn-danger" onClick={() => confirmModal.onConfirm && confirmModal.onConfirm()}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {orderDetail && (
+        <div className="confirm-modal-overlay" onClick={() => setOrderDetail(null)}>
+          <div className="order-detail-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="order-detail-modal__head">
+              <div>
+                <h3>{orderDetail.orderId}</h3>
+                <span className={`status-badge status-${(orderDetail.status || '').toLowerCase()}`}>{orderDetail.status}</span>
+              </div>
+              <button className="cart-drawer__close" onClick={() => setOrderDetail(null)} aria-label="Close">✕</button>
+            </div>
+
+            <div className="order-detail-modal__section">
+              <h4>Customer</h4>
+              <p><strong>{orderDetail.customer?.name}</strong></p>
+              <p>📞 {orderDetail.customer?.phone}</p>
+              <p>📍 {orderDetail.customer?.address}</p>
+              {orderDetail.customer?.notes && <p>📝 {orderDetail.customer.notes}</p>}
+            </div>
+
+            <div className="order-detail-modal__section">
+              <h4>Items</h4>
+              <table className="order-detail-modal__items">
+                <tbody>
+                  {(orderDetail.items || []).map((it, i) => (
+                    <tr key={i}>
+                      <td>{it.name}</td>
+                      <td>× {it.quantity}</td>
+                      <td className="order-detail-modal__amt">₹{it.lineTotal ?? (it.price * it.quantity)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="order-detail-modal__totals">
+              <div><span>Subtotal</span><span>₹{orderDetail.subtotal}</span></div>
+              {orderDetail.deliveryCharge > 0 && <div><span>Delivery</span><span>₹{orderDetail.deliveryCharge}</span></div>}
+              <div className="order-detail-modal__grand"><span>Grand Total</span><span>₹{orderDetail.grandTotal}</span></div>
+            </div>
+
+            <div className="order-detail-modal__foot">
+              <span>{orderDetail.createdAt ? new Date(orderDetail.createdAt).toLocaleString() : ''}</span>
+              <a className="btn btn-sm btn-whatsapp" href={`https://wa.me/${(orderDetail.customer?.phone || '').replace(/\D/g, '')}`} target="_blank" rel="noreferrer">Message Customer</a>
             </div>
           </div>
         </div>

@@ -13,23 +13,14 @@ router.post('/', upload.single('image'), asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Please upload a file' });
   }
 
-  // Convert buffer to base64
+  // Convert buffer to a base64 data URI for Cloudinary upload
   const b64 = Buffer.from(req.file.buffer).toString('base64');
-  let dataURI = `data:${req.file.mimetype};base64,${b64}`;
-
-  // Use dynamic storage configuration for Cloudinary
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'nalamvaazha',
-    allowedFormats: ['jpeg', 'png', 'jpg', 'webp'],
-  },
-});
+  const dataURI = `data:${req.file.mimetype};base64,${b64}`;
 
   // Upload to cloudinary
   const result = await cloudinary.uploader.upload(dataURI, {
     folder: 'nalamvaazha',
-    resource_type: 'auto',
+    resource_type: 'image',
   });
 
   res.status(200).json({

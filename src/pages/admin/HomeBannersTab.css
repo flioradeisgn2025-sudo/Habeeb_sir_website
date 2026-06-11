@@ -1,0 +1,131 @@
+.home-banners {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 900px;
+}
+
+.hb-card {
+  padding: 28px;
+}
+
+.hb-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.hb-card__head h3 {
+  font-size: 1.2rem;
+  color: var(--green-800);
+}
+
+.hb-card__hint {
+  font-size: 13px;
+  color: var(--text-hint);
+  margin-top: 4px;
+}
+
+/* Toggle switch */
+.hb-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.hb-toggle input { display: none; }
+
+.hb-toggle__track {
+  width: 42px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--border-medium);
+  position: relative;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.hb-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: var(--transition);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.hb-toggle input:checked + .hb-toggle__track {
+  background: var(--green-600);
+}
+
+.hb-toggle input:checked + .hb-toggle__track .hb-toggle__thumb {
+  transform: translateX(18px);
+}
+
+.hb-toggle__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Announcement preview */
+.hb-ann-preview {
+  margin-top: 8px;
+  background: var(--green-800);
+  color: #fff;
+  text-align: center;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Banner list */
+.hb-banner-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.hb-banner {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 20px;
+  padding: 18px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--green-50);
+  transition: var(--transition);
+}
+
+.hb-banner--off {
+  opacity: 0.6;
+}
+
+.hb-banner__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hb-banner__toggle-group {
+  justify-content: flex-end;
+}
+
+.hb-banner__delete {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+@media (max-width: 700px) {
+  .hb-banner {
+    grid-template-columns: 1fr;
+  }
+}
