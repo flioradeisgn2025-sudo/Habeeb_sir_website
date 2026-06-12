@@ -22,7 +22,20 @@ const DEFAULT_PASSWORD = defaultPassword();
 const TOKEN_TTL = 60 * 60 * 8; // 8 hours
 
 // Ensure a default admin exists (first-run bootstrap). Safe to call repeatedly.
+// With ADMIN_FORCE_RESET=true, the stored account is overwritten with the env
+// credentials — an escape hatch when the admin password is lost. Remove the
+// flag after logging back in.
 async function ensureDefaultAdmin() {
+  if (process.env.ADMIN_FORCE_RESET === 'true') {
+    await Admin.deleteMany({});
+    await Admin.create({
+      username: DEFAULT_USERNAME.toLowerCase(),
+      passwordHash: hashPassword(DEFAULT_PASSWORD),
+    });
+    // eslint-disable-next-line no-console
+    console.warn(`[auth] ADMIN_FORCE_RESET active — admin reset to "${DEFAULT_USERNAME}". Remove the flag now.`);
+    return;
+  }
   const count = await Admin.estimatedDocumentCount();
   if (count === 0) {
     await Admin.create({
