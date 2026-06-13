@@ -11,9 +11,6 @@ const createRateLimiter = require('./middleware/rateLimit');
 // Load env vars
 dotenv.config();
 
-// Connect to database
-connectDB();
-
 const app = express();
 
 // Trust the first proxy (needed for correct req.ip behind hosts like Vercel/NGINX)
@@ -35,6 +32,10 @@ app.use(cors({
     // Allow same-origin / server-to-server / curl (no Origin header)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
+    // Allow any Vercel deployment domain (previews + production)
+    try {
+      if (new URL(origin).hostname.endsWith('.vercel.app')) return callback(null, true);
+    } catch {}
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -51,6 +52,19 @@ app.use(compression());
 
 // Global, lenient rate limiter for the whole API
 app.use('/api', createRateLimiter({ windowMs: 60 * 1000, max: 200 }));
+
+// Ensure the database is connected before handling any API request. On
+// serverless the connection is cached across invocations, so this only pays
+// the connect cost on a cold start.
+app.use('/api', async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('DB connection failed:', err.message);
+    res.status(503).json({ success: false, message: 'Database unavailable. Please try again shortly.' });
+  }
+});
 
 // ── Public routers ──
 app.use('/api/products', require('./routes/products'));
