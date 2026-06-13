@@ -97,8 +97,9 @@ export function ProductProvider({ children }) {
     if (localProducts && localProducts.length > 0) {
       setAllProducts(localProducts)
       setCategories(localCategories || buildStaticCategories())
-      // Ping API in the background just to flag online status (no data overwrite)
-      axios.get('/api/products', { timeout: 1500 })
+      // Ping API in the background just to flag online status (no data overwrite).
+      // Generous timeout so a serverless cold start isn't mistaken for offline.
+      axios.get('/api/products', { timeout: 15000 })
         .then(() => setIsApiOnline(true))
         .catch(() => setIsApiOnline(false))
       setLoading(false)
@@ -107,8 +108,8 @@ export function ProductProvider({ children }) {
 
     try {
       const [productsRes, categoriesRes] = await Promise.all([
-        axios.get('/api/products', { timeout: 1500 }),
-        axios.get('/api/categories', { timeout: 1500 })
+        axios.get('/api/products', { timeout: 15000 }),
+        axios.get('/api/categories', { timeout: 15000 })
       ])
       const apiProducts = productsRes.data.data || []
       const apiCategories = categoriesRes.data.data || []

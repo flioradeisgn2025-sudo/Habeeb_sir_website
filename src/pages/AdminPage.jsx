@@ -183,8 +183,8 @@ function AdminDashboard({ onLogout }) {
     const fetchAdminData = async () => {
       setDataLoading(true)
       const results = await Promise.allSettled([
-        axios.get('/api/admin/orders', { timeout: 4000 }),
-        axios.get('/api/settings', { timeout: 4000 })
+        axios.get('/api/admin/orders', { timeout: 15000 }),
+        axios.get('/api/settings', { timeout: 15000 })
       ])
       if (results[0].status === 'fulfilled') setOrders(results[0].value.data.data)
       if (results[1].status === 'fulfilled') {
