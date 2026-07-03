@@ -4,16 +4,35 @@ const Product = require('../models/Product');
 const Category = require('../models/Category');
 
 // Accept a category as either a Mongo ObjectId or a slug (the frontend may
-// hold either depending on where its category list came from).
-async function resolveCategoryId(value) {
-  if (!value) return null;
-  const raw = typeof value === 'object' ? (value._id || value.slug) : value;
-  if (mongoose.isValidObjectId(raw)) {
-    const byId = await Category.findById(raw).select('_id');
-    if (byId) return byId._id;
+// hold either depending on where its category list came from). If the
+// category isn't in the database yet but the client sent its details
+// (categoryData), create it — this covers the built-in demo categories that
+// exist in the UI before anything was ever saved to the database.
+async function resolveCategoryId(value, categoryData) {
+  const raw = value && typeof value === 'object' ? (value._id || value.slug) : value;
+  if (raw) {
+    if (mongoose.isValidObjectId(raw)) {
+      const byId = await Category.findById(raw).select('_id');
+      if (byId) return byId._id;
+    }
+    const bySlug = await Category.findOne({ slug: raw }).select('_id');
+    if (bySlug) return bySlug._id;
   }
-  const bySlug = await Category.findOne({ slug: raw }).select('_id');
-  return bySlug ? bySlug._id : null;
+
+  if (categoryData && categoryData.name) {
+    const slug = slugify(categoryData.slug || categoryData.name);
+    if (!slug) return null;
+    const existing = await Category.findOne({ $or: [{ slug }, { name: categoryData.name }] }).select('_id');
+    if (existing) return existing._id;
+    const created = await Category.create({
+      name: categoryData.name,
+      slug,
+      image: typeof categoryData.image === 'string' ? { url: categoryData.image } : (categoryData.image || {}),
+      displayOrder: await Category.countDocuments(),
+    });
+    return created._id;
+  }
+  return null;
 }
 
 function slugify(text) {
@@ -98,7 +117,7 @@ exports.createProduct = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Name, description and price are required' });
   }
 
-  const categoryId = await resolveCategoryId(req.body.category);
+  const categoryId = await resolveCategoryId(req.body.category, req.body.categoryData);
   if (!categoryId) {
     return res.status(400).json({ success: false, message: 'Unknown category — create the category first' });
   }
@@ -156,7 +175,7 @@ exports.updateProduct = asyncHandler(async (req, res) => {
   if (isFeatured !== undefined) updates.isFeatured = isFeatured;
 
   if (req.body.category !== undefined) {
-    const categoryId = await resolveCategoryId(req.body.category);
+    const categoryId = await resolveCategoryId(req.body.category, req.body.categoryData);
     if (!categoryId) {
       return res.status(400).json({ success: false, message: 'Unknown category' });
     }

@@ -159,6 +159,19 @@ export function ProductProvider({ children }) {
   const buildImagePayload = (mainImage, extraImages) =>
     [mainImage, ...(extraImages || [])].filter(Boolean).map((url, i) => ({ url, isPrimary: i === 0 }))
 
+  // Send the selected category's details along with its id/slug so the server
+  // can create it on the fly if it isn't in the database yet (demo categories).
+  const buildCategoryData = (categoryRef) => {
+    const cat = categories.find(c => (c._id || c.slug) === categoryRef)
+    if (!cat) return undefined
+    return {
+      name: cat.name,
+      slug: cat.slug,
+      description: cat.description || '',
+      image: cat.image?.url || '',
+    }
+  }
+
   const addProduct = async (productData) => {
     if (isApiOnline) {
       try {
@@ -166,6 +179,7 @@ export function ProductProvider({ children }) {
           name: productData.name,
           description: productData.description,
           category: productData.category,
+          categoryData: buildCategoryData(productData.category),
           price: Number(productData.price),
           salePrice: productData.salePrice ? Number(productData.salePrice) : null,
           stock: Number(productData.stock) || 0,
@@ -216,6 +230,7 @@ export function ProductProvider({ children }) {
           description: updates.description,
           ingredients: updates.ingredients,
           category: updates.category,
+          categoryData: buildCategoryData(updates.category),
           price: updates.price,
           salePrice: updates.salePrice === '' ? null : updates.salePrice,
           stock: updates.stock,
