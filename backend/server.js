@@ -16,8 +16,9 @@ const app = express();
 // Trust the first proxy (needed for correct req.ip behind hosts like Vercel/NGINX)
 app.set('trust proxy', 1);
 
-// Body parser with a size limit to reject oversized payloads
-app.use(express.json({ limit: '1mb' }));
+// Body parser with a size limit to reject oversized payloads. Product images
+// arrive as base64 data URLs, so this must comfortably fit a compressed image.
+app.use(express.json({ limit: '8mb' }));
 
 // CORS — restrict to known origins instead of a wildcard
 const allowedOrigins = [

@@ -31,6 +31,18 @@ const productSchema = new mongoose.Schema({
     type: Number,
     default: null,
   },
+  unit: {
+    type: String,
+    default: '',
+  },
+  ingredients: {
+    type: String,
+    default: '',
+  },
+  badge: {
+    type: String,
+    default: null,
+  },
   stock: {
     type: Number,
     required: true,
@@ -40,7 +52,7 @@ const productSchema = new mongoose.Schema({
   images: [
     {
       url: { type: String, required: true },
-      publicId: { type: String, required: true },
+      publicId: { type: String, default: '' },
       isPrimary: { type: Boolean, default: false },
     }
   ],

@@ -1,5 +1,33 @@
 import toast from 'react-hot-toast'
 
+// Downscale + recompress an image so the base64 payload stays small enough to
+// send to the API (serverless request bodies are capped at a few MB).
+const MAX_DIMENSION = 1200
+
+function compressImage(dataUrl, fileType, done) {
+  const img = new Image()
+  img.onload = () => {
+    let { width, height } = img
+    if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+      const scale = MAX_DIMENSION / Math.max(width, height)
+      width = Math.round(width * scale)
+      height = Math.round(height * scale)
+    }
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+    // Keep PNG for images that may need transparency, JPEG for everything else
+    const output = fileType === 'image/png'
+      ? canvas.toDataURL('image/png')
+      : canvas.toDataURL('image/jpeg', 0.82)
+    // If compression somehow made it bigger, keep the original
+    done(output.length < dataUrl.length ? output : dataUrl)
+  }
+  img.onerror = () => done(dataUrl)
+  img.src = dataUrl
+}
+
 // Reusable drag/drop + click image picker. Stores the image as a base64 data
 // URL (works offline). Also accepts a pasted URL via the optional field below.
 export default function ImageUpload({ value, onChange, id, small }) {
@@ -8,7 +36,7 @@ export default function ImageUpload({ value, onChange, id, small }) {
     if (!file.type.startsWith('image/')) { toast.error('Please choose an image file'); return }
     if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return }
     const reader = new FileReader()
-    reader.onload = (ev) => onChange(ev.target.result)
+    reader.onload = (ev) => compressImage(ev.target.result, file.type, onChange)
     reader.readAsDataURL(file)
   }
 

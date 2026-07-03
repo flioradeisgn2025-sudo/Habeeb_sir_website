@@ -17,6 +17,7 @@ router.route('/')
 
 router.route('/:id')
   .put(updateProduct)
+  .patch(updateProduct)
   .delete(deleteProduct);
 
 router.patch('/:id/toggle', togglePublishStatus);

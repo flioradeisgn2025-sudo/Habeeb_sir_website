@@ -8,7 +8,9 @@ const ProductContext = createContext(null)
 const STORAGE_KEY = 'nalamvaazha_products'
 const CAT_STORAGE_KEY = 'nalamvaazha_categories'
 const DATA_VERSION_KEY = 'nalamvaazha_data_version'
-const CURRENT_DATA_VERSION = 2 // bump this to force re-seed
+const CURRENT_DATA_VERSION = 3 // bump this to force clients to drop stale local caches
+
+const API_TIMEOUT = 15000 // generous so serverless cold starts don't read as offline
 
 const BASE = import.meta.env.BASE_URL
 
@@ -65,51 +67,54 @@ function loadLocalCategories() {
   }
 }
 
+// Extract a human-readable message from an axios error
+function errMessage(err, fallback) {
+  return err?.response?.data?.message || err?.message || fallback
+}
+
 export function ProductProvider({ children }) {
   const [allProducts, setAllProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [isApiOnline, setIsApiOnline] = useState(false)
 
-  // Persist products to localStorage whenever they change
+  // Cache to localStorage so the site paints instantly on the next visit and
+  // still works offline. The API remains the source of truth.
   useEffect(() => {
     if (allProducts.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(allProducts))
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(allProducts)) } catch {}
     }
   }, [allProducts])
 
   useEffect(() => {
     if (categories.length > 0) {
-      localStorage.setItem(CAT_STORAGE_KEY, JSON.stringify(categories))
+      try { localStorage.setItem(CAT_STORAGE_KEY, JSON.stringify(categories)) } catch {}
     }
   }, [categories])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
 
-    // localStorage is the source of truth for admin edits — only seed from
-    // API/static on a fresh browser where no local data exists yet.
+    // Paint instantly from the local cache (if it isn't from an old app
+    // version), then refresh from the API below.
     const savedVersion = Number(localStorage.getItem(DATA_VERSION_KEY)) || 0
     const isStale = savedVersion < CURRENT_DATA_VERSION
     const localProducts = isStale ? null : loadLocalProducts()
     const localCategories = isStale ? null : loadLocalCategories()
+    const hasLocal = !!(localProducts && localProducts.length > 0)
 
-    if (localProducts && localProducts.length > 0) {
+    if (hasLocal) {
       setAllProducts(localProducts)
       setCategories(localCategories || buildStaticCategories())
-      // Ping API in the background just to flag online status (no data overwrite).
-      // Generous timeout so a serverless cold start isn't mistaken for offline.
-      axios.get('/api/products', { timeout: 15000 })
-        .then(() => setIsApiOnline(true))
-        .catch(() => setIsApiOnline(false))
       setLoading(false)
-      return
     }
 
+    // The API/database is the source of truth: always fetch and overwrite the
+    // local cache so admin changes reach every browser and device.
     try {
       const [productsRes, categoriesRes] = await Promise.all([
-        axios.get('/api/products', { timeout: 15000 }),
-        axios.get('/api/categories', { timeout: 15000 })
+        axios.get('/api/products', { timeout: API_TIMEOUT }),
+        axios.get('/api/categories', { timeout: API_TIMEOUT })
       ])
       const apiProducts = productsRes.data.data || []
       const apiCategories = categoriesRes.data.data || []
@@ -118,20 +123,22 @@ export function ProductProvider({ children }) {
       if (apiProducts.length > 0) {
         setAllProducts(apiProducts)
         setCategories(apiCategories.length ? apiCategories : buildStaticCategories())
-        localStorage.setItem(DATA_VERSION_KEY, String(CURRENT_DATA_VERSION))
       } else {
+        // Empty database — fall back to the built-in demo catalog
+        const staticCategories = apiCategories.length ? apiCategories : buildStaticCategories()
+        setCategories(staticCategories)
+        setAllProducts(buildStaticProducts(buildStaticCategories()))
+      }
+      localStorage.setItem(DATA_VERSION_KEY, String(CURRENT_DATA_VERSION))
+    } catch {
+      console.warn('MongoDB API unreachable, using local/static data.')
+      setIsApiOnline(false)
+      if (!hasLocal) {
         const staticCategories = buildStaticCategories()
         setCategories(staticCategories)
         setAllProducts(buildStaticProducts(staticCategories))
         localStorage.setItem(DATA_VERSION_KEY, String(CURRENT_DATA_VERSION))
       }
-    } catch {
-      console.warn('MongoDB API unreachable, seeding from static data.')
-      setIsApiOnline(false)
-      const staticCategories = buildStaticCategories()
-      setCategories(staticCategories)
-      setAllProducts(buildStaticProducts(staticCategories))
-      localStorage.setItem(DATA_VERSION_KEY, String(CURRENT_DATA_VERSION))
     } finally {
       setLoading(false)
     }
@@ -142,10 +149,40 @@ export function ProductProvider({ children }) {
   }, [fetchData])
 
   // ── CRUD Operations ──────────────────────────────────────
+  // Every operation saves to the API first (when reachable) and only updates
+  // local state from the server's response, so the website always reflects
+  // what is actually in the database. Offline, changes are kept locally so a
+  // demo without a backend still works.
 
   const getProductId = (p) => p._id || p.id
 
-  const addProduct = (productData) => {
+  const buildImagePayload = (mainImage, extraImages) =>
+    [mainImage, ...(extraImages || [])].filter(Boolean).map((url, i) => ({ url, isPrimary: i === 0 }))
+
+  const addProduct = async (productData) => {
+    if (isApiOnline) {
+      try {
+        const payload = {
+          name: productData.name,
+          description: productData.description,
+          category: productData.category,
+          price: Number(productData.price),
+          salePrice: productData.salePrice ? Number(productData.salePrice) : null,
+          stock: Number(productData.stock) || 0,
+          unit: productData.unit || '',
+          ingredients: productData.ingredients || '',
+          images: buildImagePayload(productData.image, productData.extraImages),
+        }
+        const res = await axios.post('/api/admin/products', payload, { timeout: API_TIMEOUT })
+        const created = res.data.data
+        setAllProducts(prev => [created, ...prev])
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, message: errMessage(err, 'Could not save product to the server') }
+      }
+    }
+
+    // Offline fallback — local-only product
     const extraImages = (productData.extraImages || []).filter(Boolean)
     const allImages = [productData.image, ...extraImages].filter(Boolean).map(url => ({ url }))
     const newProduct = {
@@ -167,26 +204,33 @@ export function ProductProvider({ children }) {
       isAdmin: true,
       createdAt: new Date().toISOString()
     }
-
-    // Instant local update
-    setAllProducts(prev => [...prev, newProduct])
-
-    // Sync to API in background
-    if (isApiOnline) {
-      const payload = {
-        ...productData,
-        price: Number(productData.price),
-        stock: Number(productData.stock),
-        images: [{ url: productData.image, publicId: 'dummy', isPrimary: true }],
-        slug: productData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
-      }
-      axios.post('/api/admin/products', payload, { timeout: 3000 }).catch(() => {})
-    }
-    return true
+    setAllProducts(prev => [newProduct, ...prev])
+    return { ok: true, offline: true }
   }
 
-  const updateProduct = (id, updates) => {
-    // Instant local update
+  const updateProduct = async (id, updates) => {
+    if (isApiOnline && !String(id).startsWith('local-')) {
+      try {
+        const payload = {
+          name: updates.name,
+          description: updates.description,
+          ingredients: updates.ingredients,
+          category: updates.category,
+          price: updates.price,
+          salePrice: updates.salePrice === '' ? null : updates.salePrice,
+          stock: updates.stock,
+          images: updates.image ? buildImagePayload(updates.image, updates.extraImages) : undefined,
+        }
+        const res = await axios.put(`/api/admin/products/${id}`, payload, { timeout: API_TIMEOUT })
+        const updated = res.data.data
+        setAllProducts(prev => prev.map(p => (getProductId(p) === id ? updated : p)))
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, message: errMessage(err, 'Could not update product on the server') }
+      }
+    }
+
+    // Offline fallback — local-only update
     setAllProducts(prev => prev.map(p => {
       if (getProductId(p) !== id) return p
       const updatedCategory = categories.find(c => (c._id || c.slug) === updates.category) || p.category
@@ -208,51 +252,51 @@ export function ProductProvider({ children }) {
         image: mainImg,
       }
     }))
+    return { ok: true, offline: true }
+  }
 
-    // Sync to API in background
-    if (isApiOnline) {
-      const payload = {
-        name: updates.name,
-        price: Number(updates.price),
-        salePrice: updates.salePrice ? Number(updates.salePrice) : undefined,
-        stock: Number(updates.stock),
-        description: updates.description,
-        category: updates.category,
-        images: [{ url: updates.image, publicId: 'dummy', isPrimary: true }]
+  const deleteProduct = async (id) => {
+    if (isApiOnline && !String(id).startsWith('local-')) {
+      try {
+        await axios.delete(`/api/admin/products/${id}`, { timeout: API_TIMEOUT })
+      } catch (err) {
+        return { ok: false, message: errMessage(err, 'Could not delete product on the server') }
       }
-      axios.patch(`/api/admin/products/${id}`, payload, { timeout: 3000 }).catch(() => {})
     }
-    return true
-  }
-
-  const deleteProduct = (id) => {
-    // Instant local delete
     setAllProducts(prev => prev.filter(p => getProductId(p) !== id))
-
-    // Sync to API in background
-    if (isApiOnline) {
-      axios.delete(`/api/admin/products/${id}`, { timeout: 3000 }).catch(() => {})
-    }
-    return true
+    return { ok: true }
   }
 
-  const togglePublish = (id) => {
-    // Instant local toggle
+  const togglePublish = async (id) => {
+    if (isApiOnline && !String(id).startsWith('local-')) {
+      try {
+        const res = await axios.patch(`/api/admin/products/${id}/toggle`, {}, { timeout: API_TIMEOUT })
+        const updated = res.data.data
+        setAllProducts(prev => prev.map(p => (getProductId(p) === id ? updated : p)))
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, message: errMessage(err, 'Could not update visibility on the server') }
+      }
+    }
     setAllProducts(prev => prev.map(p => {
       if (getProductId(p) !== id) return p
       return { ...p, isPublished: !p.isPublished }
     }))
-
-    // Sync to API in background
-    if (isApiOnline) {
-      axios.patch(`/api/admin/products/${id}/toggle`, {}, { timeout: 3000 }).catch(() => {})
-    }
-    return true
+    return { ok: true }
   }
 
   // ── Category CRUD ──────────────────────────────────────
 
-  const addCategory = (catData) => {
+  const addCategory = async (catData) => {
+    if (isApiOnline) {
+      try {
+        const res = await axios.post('/api/admin/categories', catData, { timeout: API_TIMEOUT })
+        setCategories(prev => [...prev, res.data.data])
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, message: errMessage(err, 'Could not save category to the server') }
+      }
+    }
     const newCat = {
       _id: 'cat-' + Date.now(),
       name: catData.name,
@@ -262,13 +306,20 @@ export function ProductProvider({ children }) {
       displayOrder: categories.length,
     }
     setCategories(prev => [...prev, newCat])
-    if (isApiOnline) {
-      axios.post('/api/admin/categories', catData, { timeout: 3000 }).catch(() => {})
-    }
-    return true
+    return { ok: true, offline: true }
   }
 
-  const updateCategory = (id, updates) => {
+  const updateCategory = async (id, updates) => {
+    if (isApiOnline && !String(id).startsWith('cat-')) {
+      try {
+        const res = await axios.put(`/api/admin/categories/${id}`, updates, { timeout: API_TIMEOUT })
+        const updated = res.data.data
+        setCategories(prev => prev.map(c => ((c._id || c.slug) === id ? updated : c)))
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, message: errMessage(err, 'Could not update category on the server') }
+      }
+    }
     setCategories(prev => prev.map(c => {
       const cid = c._id || c.slug
       if (cid !== id) return c
@@ -280,18 +331,19 @@ export function ProductProvider({ children }) {
         image: updates.image ? { url: updates.image } : c.image,
       }
     }))
-    if (isApiOnline) {
-      axios.patch(`/api/admin/categories/${id}`, updates, { timeout: 3000 }).catch(() => {})
-    }
-    return true
+    return { ok: true, offline: true }
   }
 
-  const deleteCategory = (id) => {
-    setCategories(prev => prev.filter(c => (c._id || c.slug) !== id))
-    if (isApiOnline) {
-      axios.delete(`/api/admin/categories/${id}`, { timeout: 3000 }).catch(() => {})
+  const deleteCategory = async (id) => {
+    if (isApiOnline && !String(id).startsWith('cat-')) {
+      try {
+        await axios.delete(`/api/admin/categories/${id}`, { timeout: API_TIMEOUT })
+      } catch (err) {
+        return { ok: false, message: errMessage(err, 'Could not delete category on the server') }
+      }
     }
-    return true
+    setCategories(prev => prev.filter(c => (c._id || c.slug) !== id))
+    return { ok: true }
   }
 
   // ── Query Helpers ──────────────────────────────────────

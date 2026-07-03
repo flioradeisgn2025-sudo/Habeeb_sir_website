@@ -1,6 +1,18 @@
 const asyncHandler = require('../middleware/asyncHandler');
 const Category = require('../models/Category');
 
+function slugify(text) {
+  return String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+}
+
+// The admin form sends `image` as a plain URL/data-URL string; the schema
+// stores { url, publicId }.
+function normalizeImage(image) {
+  if (image === undefined) return undefined;
+  if (typeof image === 'string') return { url: image };
+  return image;
+}
+
 // @desc    Get all categories
 // @route   GET /api/categories
 // @access  Public
@@ -13,7 +25,22 @@ exports.getCategories = asyncHandler(async (req, res) => {
 // @route   POST /api/admin/categories
 // @access  Admin
 exports.createCategory = asyncHandler(async (req, res) => {
-  const category = await Category.create(req.body);
+  const name = (req.body.name || '').trim();
+  if (!name) {
+    return res.status(400).json({ success: false, message: 'Category name is required' });
+  }
+
+  const base = slugify(req.body.slug || name) || 'category';
+  let slug = base;
+  let n = 1;
+  while (await Category.exists({ slug })) slug = `${base}-${++n}`;
+
+  const category = await Category.create({
+    name,
+    slug,
+    image: normalizeImage(req.body.image) || {},
+    displayOrder: req.body.displayOrder !== undefined ? req.body.displayOrder : await Category.countDocuments(),
+  });
   res.status(201).json({ success: true, data: category });
 });
 
@@ -25,7 +52,10 @@ exports.updateCategory = asyncHandler(async (req, res) => {
   if (!category) {
     return res.status(404).json({ success: false, message: 'Category not found' });
   }
-  category = await Category.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+  const updates = { ...req.body };
+  if (updates.image !== undefined) updates.image = normalizeImage(updates.image);
+  if (updates.slug !== undefined) updates.slug = slugify(updates.slug);
+  category = await Category.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
   res.status(200).json({ success: true, data: category });
 });
 

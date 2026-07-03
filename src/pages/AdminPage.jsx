@@ -280,9 +280,9 @@ function AdminDashboard({ onLogout }) {
       'Delete product?',
       `Are you sure you want to delete "${product?.name || 'this product'}"? This action cannot be undone.`,
       async () => {
-        const success = await deleteProduct(id)
-        if (success) toast.success('Product deleted')
-        else toast.error('Delete failed')
+        const result = await deleteProduct(id)
+        if (result.ok) toast.success('Product deleted')
+        else toast.error(result.message || 'Delete failed')
         closeConfirm()
       }
     )
@@ -290,16 +290,17 @@ function AdminDashboard({ onLogout }) {
 
   const handleUpload = async (e) => {
     e.preventDefault()
-    const success = await addProduct(prodForm)
-    if (success) {
-      toast.success('Product created!')
+    const result = await addProduct(prodForm)
+    if (result.ok) {
+      toast.success(result.offline ? 'Product saved locally (backend offline)' : 'Product created!')
       setProdForm({ name: '', category: categories[0]?._id || categories[0]?.slug || '', price: '', stock: '100', description: '', image: '', salePrice: '', ingredients: '', extraImages: [''] })
-    } else toast.error('Upload failed')
+    } else toast.error(result.message || 'Upload failed')
   }
 
   const handleTogglePublish = async (id) => {
-    const success = await togglePublish(id)
-    if (success) toast.success('Product visibility updated')
+    const result = await togglePublish(id)
+    if (result.ok) toast.success('Product visibility updated')
+    else toast.error(result.message || 'Could not update visibility')
   }
 
   const startEditing = (product) => {
@@ -321,16 +322,16 @@ function AdminDashboard({ onLogout }) {
   const cancelEditing = () => { setEditingId(null); setEditForm({}) }
 
   const handleSaveEdit = async (id) => {
-    const success = await updateProduct(id, editForm)
-    if (success) { toast.success('Product updated!'); setEditingId(null); setEditForm({}) }
-    else toast.error('Update failed')
+    const result = await updateProduct(id, editForm)
+    if (result.ok) { toast.success('Product updated!'); setEditingId(null); setEditForm({}) }
+    else toast.error(result.message || 'Update failed')
   }
 
   const handleUpdateOrderStatus = async (id, status) => {
     try {
       await axios.patch(`/api/admin/orders/${id}`, { status })
       toast.success(`Order marked as ${status}`)
-      const res = await axios.get('/api/admin/orders', { timeout: 1000 })
+      const res = await axios.get('/api/admin/orders', { timeout: 15000 })
       setOrders(res.data.data)
     } catch { toast.error('Status update failed — backend offline') }
   }
@@ -339,7 +340,8 @@ function AdminDashboard({ onLogout }) {
     e.preventDefault()
     localStorage.setItem('nalamvaazha_settings', JSON.stringify(sData))
     toast.success('Settings saved!')
-    axios.put('/api/admin/settings', sData, { timeout: 1000 }).catch(() => {})
+    axios.put('/api/admin/settings', sData, { timeout: 15000 })
+      .catch(() => toast.error('Settings could not be saved to the server'))
   }
 
   const handleChangeCredentials = async (e) => {
@@ -376,12 +378,14 @@ function AdminDashboard({ onLogout }) {
   }
 
   // Category handlers
-  const handleAddCategory = (e) => {
+  const handleAddCategory = async (e) => {
     e.preventDefault()
     if (!catForm.name) { toast.error('Category name required'); return }
-    addCategory(catForm)
-    toast.success('Category added!')
-    setCatForm({ name: '', description: '', image: '' })
+    const result = await addCategory(catForm)
+    if (result.ok) {
+      toast.success('Category added!')
+      setCatForm({ name: '', description: '', image: '' })
+    } else toast.error(result.message || 'Could not add category')
   }
 
   const startEditingCat = (cat) => {
@@ -394,11 +398,13 @@ function AdminDashboard({ onLogout }) {
     })
   }
 
-  const handleSaveCatEdit = (id) => {
-    updateCategory(id, editCatForm)
-    toast.success('Category updated!')
-    setEditingCatId(null)
-    setEditCatForm({})
+  const handleSaveCatEdit = async (id) => {
+    const result = await updateCategory(id, editCatForm)
+    if (result.ok) {
+      toast.success('Category updated!')
+      setEditingCatId(null)
+      setEditCatForm({})
+    } else toast.error(result.message || 'Could not update category')
   }
 
   const handleDeleteCategory = (id) => {
@@ -407,9 +413,10 @@ function AdminDashboard({ onLogout }) {
     const message = catProducts.length > 0
       ? `This category has ${catProducts.length} product(s). Deleting it will not delete the products, but they may become uncategorised. Continue?`
       : `Are you sure you want to delete the category "${cat?.name || ''}"? This action cannot be undone.`
-    askConfirm('Delete category?', message, () => {
-      deleteCategory(id)
-      toast.success('Category deleted')
+    askConfirm('Delete category?', message, async () => {
+      const result = await deleteCategory(id)
+      if (result.ok) toast.success('Category deleted')
+      else toast.error(result.message || 'Could not delete category')
       closeConfirm()
     })
   }
