@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useSiteContent } from '../context/SiteContentContext'
-import { loadOrderSettings, placeOrder } from '../lib/checkout'
+import { loadOrderSettings, placeOrder, preopenWhatsAppWindow, sendToWhatsApp } from '../lib/checkout'
 import toast from 'react-hot-toast'
 import './CartPage.css'
 
@@ -37,6 +37,9 @@ export default function CartPage() {
       return
     }
 
+    // Must happen synchronously inside the tap, before any await, or mobile
+    // browsers will popup-block the WhatsApp handoff
+    const preopened = preopenWhatsAppWindow()
     setLoading(true)
 
     try {
@@ -48,18 +51,19 @@ export default function CartPage() {
         waTemplate: settings.waTemplate,
       })
 
-      const opened = window.open(whatsappUrl, '_blank')
+      const handedOff = sendToWhatsApp(whatsappUrl, preopened)
       clearCart()
 
-      if (!opened) {
+      if (!handedOff) {
         setWhatsappLink(whatsappUrl)
-        toast.error('Popup blocked! Please tap the WhatsApp button below to send your order.')
+        toast.error('Tap the WhatsApp button below to send your order.')
       } else {
         toast.success('Order placed! Check WhatsApp to send your order message.')
         navigate('/')
       }
     } catch (error) {
       console.error(error)
+      if (preopened && !preopened.closed) preopened.close()
       toast.error('Failed to submit order. Please try again.')
     } finally {
       setLoading(false)

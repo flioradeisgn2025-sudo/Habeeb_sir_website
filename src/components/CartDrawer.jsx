@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useCart } from '../context/CartContext'
-import { loadOrderSettings, placeOrder } from '../lib/checkout'
+import { loadOrderSettings, placeOrder, preopenWhatsAppWindow, sendToWhatsApp } from '../lib/checkout'
 import './CartDrawer.css'
 
 export default function CartDrawer({ isOpen, onClose }) {
@@ -36,6 +36,9 @@ export default function CartDrawer({ isOpen, onClose }) {
       toast.error('Please fill name, phone and address')
       return
     }
+    // Must happen synchronously inside the tap, before any await, or mobile
+    // browsers will popup-block the WhatsApp handoff
+    const preopened = preopenWhatsAppWindow()
     setSubmitting(true)
     try {
       // Make sure settings (esp. delivery charge) have resolved before charging
@@ -51,19 +54,19 @@ export default function CartDrawer({ isOpen, onClose }) {
         whatsappNumber: s.whatsappNumber,
         waTemplate: s.waTemplate,
       })
-      const win = window.open(whatsappUrl, '_blank')
-      if (!win) {
-        // Popup blocked — show a tap-to-open button. The order is already saved,
-        // so lock the submit button to prevent a duplicate order.
-        setFallbackUrl(whatsappUrl)
-        toast.error('Popup blocked — tap the button to send your order')
-      } else {
+      if (sendToWhatsApp(whatsappUrl, preopened)) {
         toast.success('Order placed! Finish sending it on WhatsApp.')
         setForm({ name: '', phone: '', address: '', notes: '' })
         clearCart()
         onClose()
+      } else {
+        // Blocked even so — show a tap-to-open button. The order is already
+        // saved, so lock the submit button to prevent a duplicate order.
+        setFallbackUrl(whatsappUrl)
+        toast.error('Tap the green button to send your order on WhatsApp')
       }
     } catch {
+      if (preopened && !preopened.closed) preopened.close()
       toast.error('Something went wrong. Please try again.')
     } finally {
       setSubmitting(false)
