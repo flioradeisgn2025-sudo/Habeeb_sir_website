@@ -302,13 +302,26 @@ function AdminDashboard({ onLogout }) {
     )
   }
 
+  // Full-screen status while a product uploads: 'uploading' → 'done' animation,
+  // or an 'error' popup the admin must dismiss. Uploads with base64 images can
+  // take several seconds on the serverless backend, so silence reads as broken.
+  const [uploadStatus, setUploadStatus] = useState(null) // null | {state:'uploading'|'done'|'error', message?}
+
   const handleUpload = async (e) => {
     e.preventDefault()
+    if (uploadStatus?.state === 'uploading') return
+    setUploadStatus({ state: 'uploading' })
     const result = await addProduct(prodForm)
     if (result.ok) {
-      toast.success(result.offline ? 'Product saved locally (backend offline)' : 'Product created!')
       setProdForm({ name: '', category: categories[0]?._id || categories[0]?.slug || '', price: '', stock: '100', description: '', image: '', salePrice: '', ingredients: '', extraImages: [''] })
-    } else toast.error(result.message || 'Upload failed')
+      setUploadStatus({ state: 'done', message: result.offline ? 'Saved locally — backend is offline' : 'It is now live in your catalog.' })
+      setTimeout(() => setUploadStatus(s => (s?.state === 'done' ? null : s)), 2400)
+    } else {
+      const msg = !result.message || /network error/i.test(result.message)
+        ? 'Could not reach the server. Please check your internet connection and try again — your form is untouched.'
+        : result.message
+      setUploadStatus({ state: 'error', message: msg })
+    }
   }
 
   const handleTogglePublish = async (id) => {
@@ -524,7 +537,9 @@ function AdminDashboard({ onLogout }) {
                 </div>
               ))}
             </div>
-            <button type="submit" className="btn btn-primary w-full" disabled={!prodForm.image}>Upload Product</button>
+            <button type="submit" className="btn btn-primary w-full" disabled={!prodForm.image || uploadStatus?.state === 'uploading'}>
+              {uploadStatus?.state === 'uploading' ? (<><span className="btn-spinner" aria-hidden="true" /> Uploading…</>) : 'Upload Product'}
+            </button>
           </form>
         </div>
         <div className="product-list-section">
@@ -1174,6 +1189,40 @@ function AdminDashboard({ onLogout }) {
           </>
         )}
       </section>
+
+      {uploadStatus && (
+        <div className="confirm-modal-overlay">
+          <div className="confirm-modal upload-status-modal" role="dialog" aria-modal="true">
+            {uploadStatus.state === 'uploading' && (
+              <>
+                <div className="upload-spinner" aria-hidden="true" />
+                <h3 className="confirm-modal-title">Uploading product…</h3>
+                <p className="confirm-modal-message">Please wait — this can take a few seconds. Don't close this page.</p>
+              </>
+            )}
+            {uploadStatus.state === 'done' && (
+              <>
+                <svg className="upload-check" viewBox="0 0 52 52" aria-hidden="true">
+                  <circle className="upload-check__circle" cx="26" cy="26" r="24" fill="none" />
+                  <path className="upload-check__mark" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+                </svg>
+                <h3 className="confirm-modal-title">Product added!</h3>
+                <p className="confirm-modal-message">{uploadStatus.message}</p>
+              </>
+            )}
+            {uploadStatus.state === 'error' && (
+              <>
+                <div className="confirm-modal-icon">❌</div>
+                <h3 className="confirm-modal-title">Upload failed</h3>
+                <p className="confirm-modal-message">{uploadStatus.message}</p>
+                <div className="confirm-modal-actions">
+                  <button className="btn btn-primary" onClick={() => setUploadStatus(null)}>OK</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {confirmModal.open && (
         <div className="confirm-modal-overlay" onClick={closeConfirm}>
