@@ -363,6 +363,23 @@ function AdminDashboard({ onLogout }) {
     } catch { toast.error('Status update failed — backend offline') }
   }
 
+  const handleDeleteOrder = (order) => {
+    askConfirm(
+      'Delete order?',
+      `Are you sure you want to delete order "${order.orderId}" from ${order.customer?.name || 'customer'}? This action cannot be undone.`,
+      async () => {
+        try {
+          await axios.delete(`/api/admin/orders/${order._id}`, { timeout: 15000 })
+          setOrders(prev => prev.filter(o => o._id !== order._id))
+          toast.success('Order deleted')
+        } catch (err) {
+          toast.error(err?.response?.data?.message || 'Could not delete the order — please try again')
+        }
+        closeConfirm()
+      }
+    )
+  }
+
   const saveSettings = (e) => {
     e.preventDefault()
     localStorage.setItem('nalamvaazha_settings', JSON.stringify(sData))
@@ -491,8 +508,22 @@ function AdminDashboard({ onLogout }) {
                   <td>{order.customer.name}</td>
                   <td>{new Date(order.createdAt).toLocaleDateString()}</td>
                   <td>₹{order.grandTotal}</td>
-                  <td><span className={`status-badge status-${order.status.toLowerCase()}`}>{order.status}</span></td>
-                  <td><button className="btn btn-sm btn-ghost" onClick={() => setActiveTab('orders')}>View</button></td>
+                  <td>
+                    <select
+                      className={`form-select order-status-select order-status-select--${order.status.toLowerCase()}`}
+                      value={order.status}
+                      onChange={(e) => handleUpdateOrderStatus(order._id, e.target.value)}
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Confirmed">Confirmed</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                  </td>
+                  <td>
+                    <button className="btn btn-sm btn-ghost" onClick={() => { setOrderDetail(order) }}>View</button>
+                    <button className="delete-btn" title="Delete order" onClick={() => handleDeleteOrder(order)}>🗑️</button>
+                  </td>
                 </tr>
               ))}
               {orders.length === 0 && (
@@ -767,7 +798,11 @@ function AdminDashboard({ onLogout }) {
                   <td>{order.customer.phone}</td>
                   <td>₹{order.grandTotal}</td>
                   <td>
-                    <select className="form-select" value={order.status} onChange={(e) => handleUpdateOrderStatus(order._id, e.target.value)} style={{ padding: 6, fontSize: 14, width: 'auto' }}>
+                    <select
+                      className={`form-select order-status-select order-status-select--${order.status.toLowerCase()}`}
+                      value={order.status}
+                      onChange={(e) => handleUpdateOrderStatus(order._id, e.target.value)}
+                    >
                       <option value="Pending">Pending</option>
                       <option value="Confirmed">Confirmed</option>
                       <option value="Delivered">Delivered</option>
@@ -776,6 +811,7 @@ function AdminDashboard({ onLogout }) {
                   </td>
                   <td>
                     <button className="btn btn-ghost btn-sm" onClick={() => setOrderDetail(order)}>Details</button>
+                    <button className="delete-btn" title="Delete order" onClick={() => handleDeleteOrder(order)}>🗑️</button>
                   </td>
                 </tr>
               ))}

@@ -895,6 +895,39 @@
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+/* ── Order status dropdown (colored like the status badges) ──
+   The `select.` prefix out-specifies the base .form-select rule, which sets
+   its own background/border-radius and would otherwise win the cascade. */
+select.order-status-select {
+  width: auto;
+  padding: 6px 28px 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-full, 999px);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+select.order-status-select--pending {
+  background: #FFF3E0;
+  color: #E65100;
+}
+
+select.order-status-select--confirmed {
+  background: #E3F2FD;
+  color: #1565C0;
+}
+
+select.order-status-select--delivered {
+  background: var(--green-50);
+  color: var(--green-700);
+}
+
+select.order-status-select--cancelled {
+  background: #FFEBEE;
+  color: #C62828;
+}
+
 /* ── Product upload status (loader / done / error) ── */
 .upload-status-modal {
   max-width: 360px;

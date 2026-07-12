@@ -1,6 +1,13 @@
+const mongoose = require('mongoose');
 const asyncHandler = require('../middleware/asyncHandler');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+
+// Look up an order without throwing a CastError on a malformed id
+async function findOrderById(id) {
+  if (!mongoose.isValidObjectId(id)) return null;
+  return Order.findById(id);
+}
 
 // Helper to generate ORD-YYYYMMDD-XXXX
 const generateOrderId = async () => {
@@ -137,7 +144,7 @@ exports.getOrders = asyncHandler(async (req, res) => {
 // @route   GET /api/admin/orders/:id
 // @access  Admin
 exports.getOrderById = asyncHandler(async (req, res) => {
-  const order = await Order.findById(req.params.id);
+  const order = await findOrderById(req.params.id);
   if (!order) {
     return res.status(404).json({ success: false, message: 'Order not found' });
   }
@@ -153,15 +160,29 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Status is required' });
   }
 
-  const order = await Order.findByIdAndUpdate(
-    req.params.id,
-    { status },
-    { new: true, runValidators: true }
-  );
+  const order = mongoose.isValidObjectId(req.params.id)
+    ? await Order.findByIdAndUpdate(
+        req.params.id,
+        { status },
+        { new: true, runValidators: true }
+      )
+    : null;
 
   if (!order) {
     return res.status(404).json({ success: false, message: 'Order not found' });
   }
 
   res.status(200).json({ success: true, data: order });
+});
+
+// @desc    Delete order
+// @route   DELETE /api/admin/orders/:id
+// @access  Admin
+exports.deleteOrder = asyncHandler(async (req, res) => {
+  const order = await findOrderById(req.params.id);
+  if (!order) {
+    return res.status(404).json({ success: false, message: 'Order not found' });
+  }
+  await order.deleteOne();
+  res.status(200).json({ success: true, data: {} });
 });
