@@ -1,8 +1,19 @@
+const mongoose = require('mongoose');
 const asyncHandler = require('../middleware/asyncHandler');
 const Category = require('../models/Category');
 
 function slugify(text) {
   return String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+}
+
+// The client may reference a category by Mongo id or by slug (demo categories
+// only have slugs). Never let a non-ObjectId reach findById — it throws.
+async function findCategoryByIdOrSlug(id) {
+  if (mongoose.isValidObjectId(id)) {
+    const byId = await Category.findById(id);
+    if (byId) return byId;
+  }
+  return Category.findOne({ slug: id });
 }
 
 // The admin form sends `image` as a plain URL/data-URL string; the schema
@@ -48,14 +59,14 @@ exports.createCategory = asyncHandler(async (req, res) => {
 // @route   PUT /api/admin/categories/:id
 // @access  Admin
 exports.updateCategory = asyncHandler(async (req, res) => {
-  let category = await Category.findById(req.params.id);
+  let category = await findCategoryByIdOrSlug(req.params.id);
   if (!category) {
     return res.status(404).json({ success: false, message: 'Category not found' });
   }
   const updates = { ...req.body };
   if (updates.image !== undefined) updates.image = normalizeImage(updates.image);
   if (updates.slug !== undefined) updates.slug = slugify(updates.slug);
-  category = await Category.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
+  category = await Category.findByIdAndUpdate(category._id, updates, { new: true, runValidators: true });
   res.status(200).json({ success: true, data: category });
 });
 
@@ -63,7 +74,7 @@ exports.updateCategory = asyncHandler(async (req, res) => {
 // @route   DELETE /api/admin/categories/:id
 // @access  Admin
 exports.deleteCategory = asyncHandler(async (req, res) => {
-  const category = await Category.findById(req.params.id);
+  const category = await findCategoryByIdOrSlug(req.params.id);
   if (!category) {
     return res.status(404).json({ success: false, message: 'Category not found' });
   }

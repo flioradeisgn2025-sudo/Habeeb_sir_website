@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import { useProducts } from '../context/ProductContext'
@@ -92,8 +92,8 @@ export default function AdminPage() {
 
 function AdminDashboard({ onLogout }) {
   const {
-    allProducts: products, categories, isApiOnline,
-    addProduct, updateProduct, deleteProduct, togglePublish,
+    allProducts: products, categories, isApiOnline, loading: productsLoading,
+    addProduct, updateProduct, deleteProduct, togglePublish, importDemoCatalog,
     addCategory, updateCategory, deleteCategory,
     refreshData
   } = useProducts()
@@ -205,6 +205,20 @@ function AdminDashboard({ onLogout }) {
       setProdForm(f => ({ ...f, category: categories[0]?._id || categories[0]?.slug || '' }))
     }
   }, [categories])
+
+  // Fresh database bootstrap: copy the built-in starter catalog into the
+  // database so every product the admin sees is real — editable, deletable.
+  // The server no-ops if the database has ever held a product.
+  const importAttempted = useRef(false)
+  useEffect(() => {
+    if (!isApiOnline || productsLoading || products.length > 0 || importAttempted.current) return
+    importAttempted.current = true
+    importDemoCatalog()
+      .then(count => {
+        if (count > 0) toast.success(`Added ${count} starter products to your database`)
+      })
+      .catch(() => {})
+  }, [isApiOnline, productsLoading, products.length])
 
   // Dashboard Stats
   const stats = {

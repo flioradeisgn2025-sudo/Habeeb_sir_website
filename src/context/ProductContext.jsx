@@ -8,7 +8,7 @@ const ProductContext = createContext(null)
 const STORAGE_KEY = 'nalamvaazha_products'
 const CAT_STORAGE_KEY = 'nalamvaazha_categories'
 const DATA_VERSION_KEY = 'nalamvaazha_data_version'
-const CURRENT_DATA_VERSION = 3 // bump this to force clients to drop stale local caches
+const CURRENT_DATA_VERSION = 4 // bump this to force clients to drop stale local caches
 
 const API_TIMEOUT = 15000 // generous so serverless cold starts don't read as offline
 
@@ -72,6 +72,12 @@ function errMessage(err, fallback) {
   return err?.response?.data?.message || err?.message || fallback
 }
 
+// Only 24-hex Mongo ObjectIds exist on the server. Demo ids ("ap-001") and
+// offline ids ("local-...") must never be sent to the API.
+function isDbId(id) {
+  return /^[0-9a-f]{24}$/i.test(String(id))
+}
+
 export function ProductProvider({ children }) {
   const [allProducts, setAllProducts] = useState([])
   const [categories, setCategories] = useState([])
@@ -120,14 +126,13 @@ export function ProductProvider({ children }) {
       const apiCategories = categoriesRes.data.data || []
       setIsApiOnline(true)
 
-      if (apiProducts.length > 0) {
-        setAllProducts(apiProducts)
-        setCategories(apiCategories.length ? apiCategories : buildStaticCategories())
-      } else {
-        // Empty database — fall back to the built-in demo catalog
-        const staticCategories = apiCategories.length ? apiCategories : buildStaticCategories()
-        setCategories(staticCategories)
-        setAllProducts(buildStaticProducts(buildStaticCategories()))
+      // The server answered, so the database is the source of truth — even
+      // when it's empty. (The demo catalog is only for offline/no-backend use;
+      // showing it here would resurrect products the admin deleted.)
+      setAllProducts(apiProducts)
+      setCategories(apiCategories.length ? apiCategories : buildStaticCategories())
+      if (apiProducts.length === 0) {
+        try { localStorage.removeItem(STORAGE_KEY) } catch {}
       }
       localStorage.setItem(DATA_VERSION_KEY, String(CURRENT_DATA_VERSION))
     } catch {
@@ -223,7 +228,7 @@ export function ProductProvider({ children }) {
   }
 
   const updateProduct = async (id, updates) => {
-    if (isApiOnline && !String(id).startsWith('local-')) {
+    if (isApiOnline && isDbId(id)) {
       try {
         const payload = {
           name: updates.name,
@@ -271,7 +276,7 @@ export function ProductProvider({ children }) {
   }
 
   const deleteProduct = async (id) => {
-    if (isApiOnline && !String(id).startsWith('local-')) {
+    if (isApiOnline && isDbId(id)) {
       try {
         await axios.delete(`/api/admin/products/${id}`, { timeout: API_TIMEOUT })
       } catch (err) {
@@ -283,7 +288,7 @@ export function ProductProvider({ children }) {
   }
 
   const togglePublish = async (id) => {
-    if (isApiOnline && !String(id).startsWith('local-')) {
+    if (isApiOnline && isDbId(id)) {
       try {
         const res = await axios.patch(`/api/admin/products/${id}/toggle`, {}, { timeout: API_TIMEOUT })
         const updated = res.data.data
@@ -298,6 +303,38 @@ export function ProductProvider({ children }) {
       return { ...p, isPublished: !p.isPublished }
     }))
     return { ok: true }
+  }
+
+  // One-time bootstrap: copy the built-in demo catalog into the database so
+  // the products the admin sees are real, editable and deletable. The server
+  // refuses the import if the database has ever held a product, so this can
+  // never resurrect anything the admin deleted.
+  const importDemoCatalog = async () => {
+    const staticCategories = buildStaticCategories()
+    const products = SEED_PRODUCTS.map(p => {
+      const cat = staticCategories.find(c => c.slug === p.category)
+      return {
+        name: p.name,
+        description: p.description,
+        category: p.category,
+        categoryData: cat ? {
+          name: cat.name,
+          slug: cat.slug,
+          description: cat.description || '',
+          image: cat.image?.url || '',
+        } : { name: p.category },
+        price: p.price,
+        stock: 100,
+        unit: p.unit || '',
+        ingredients: p.ingredients || '',
+        badge: p.badge || null,
+        images: (p.images || [p.image]).filter(Boolean).map((url, i) => ({ url, isPrimary: i === 0 })),
+      }
+    })
+    const res = await axios.post('/api/admin/products/import', { products }, { timeout: 60000 })
+    const imported = res.data?.data?.imported || 0
+    if (imported > 0) await fetchData()
+    return imported
   }
 
   // ── Category CRUD ──────────────────────────────────────
@@ -383,7 +420,7 @@ export function ProductProvider({ children }) {
     <ProductContext.Provider value={{
       allProducts, categories, loading, isApiOnline,
       getByCategory, getNewArrivals, getBestSellers, getAllProducts, getProductById,
-      addProduct, updateProduct, deleteProduct, togglePublish,
+      addProduct, updateProduct, deleteProduct, togglePublish, importDemoCatalog,
       addCategory, updateCategory, deleteCategory,
       refreshData: fetchData
     }}>

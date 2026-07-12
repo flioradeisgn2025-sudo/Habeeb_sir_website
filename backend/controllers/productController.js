@@ -39,6 +39,13 @@ function slugify(text) {
   return String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
 }
 
+// Look up a product by Mongo id without throwing a CastError when the client
+// sends a non-database id (e.g. a demo-catalog id like "ap-001").
+async function findProductById(id) {
+  if (!mongoose.isValidObjectId(id)) return null;
+  return Product.findById(id);
+}
+
 async function uniqueProductSlug(name, excludeId) {
   const base = slugify(name) || 'product';
   let slug = base;
@@ -90,7 +97,9 @@ exports.getProducts = asyncHandler(async (req, res) => {
 // @route   GET /api/products/:id
 // @access  Public
 exports.getProduct = asyncHandler(async (req, res) => {
-  const product = await Product.findById(req.params.id).populate('category', 'name slug');
+  const product = mongoose.isValidObjectId(req.params.id)
+    ? await Product.findById(req.params.id).populate('category', 'name slug')
+    : null;
   if (!product || product.isDeleted || !product.isPublished) {
     return res.status(404).json({ success: false, message: 'Product not found' });
   }
@@ -147,11 +156,55 @@ exports.createProduct = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: product });
 });
 
+// @desc    Import the starter catalog into a never-used database
+// @route   POST /api/admin/products/import
+// @access  Admin
+exports.importProducts = asyncHandler(async (req, res) => {
+  const items = Array.isArray(req.body.products) ? req.body.products : [];
+
+  // Only seed a database that has never held a product. Deletes are soft
+  // (isDeleted flag), so even a fully emptied catalog leaves documents behind
+  // — which is exactly what stops deleted demo products from coming back.
+  const everHadProducts = await Product.countDocuments({});
+  if (everHadProducts > 0) {
+    return res.status(200).json({ success: true, data: { imported: 0 } });
+  }
+
+  let imported = 0;
+  for (const item of items) {
+    if (!item || !item.name || !item.description || item.price === undefined) continue;
+    const categoryId = await resolveCategoryId(item.category, item.categoryData);
+    if (!categoryId) continue;
+    const images = normalizeImages(item.images) || [];
+    if (!images.length) continue;
+    if (await Product.exists({ name: item.name })) continue;
+
+    await Product.create({
+      name: item.name,
+      slug: await uniqueProductSlug(item.name),
+      description: item.description,
+      category: categoryId,
+      price: Number(item.price),
+      salePrice: item.salePrice !== undefined && item.salePrice !== '' && item.salePrice !== null ? Number(item.salePrice) : null,
+      stock: item.stock !== undefined && item.stock !== '' ? Number(item.stock) : 100,
+      unit: item.unit || '',
+      ingredients: item.ingredients || '',
+      badge: item.badge || null,
+      tags: item.tags,
+      isPublished: true,
+      images,
+    });
+    imported++;
+  }
+
+  res.status(200).json({ success: true, data: { imported } });
+});
+
 // @desc    Update product
 // @route   PUT /api/admin/products/:id
 // @access  Admin
 exports.updateProduct = asyncHandler(async (req, res) => {
-  let product = await Product.findById(req.params.id);
+  let product = await findProductById(req.params.id);
   if (!product || product.isDeleted) {
     return res.status(404).json({ success: false, message: 'Product not found' });
   }
@@ -194,7 +247,7 @@ exports.updateProduct = asyncHandler(async (req, res) => {
 // @route   DELETE /api/admin/products/:id
 // @access  Admin
 exports.deleteProduct = asyncHandler(async (req, res) => {
-  const product = await Product.findById(req.params.id);
+  const product = await findProductById(req.params.id);
   if (!product || product.isDeleted) {
     return res.status(404).json({ success: false, message: 'Product not found' });
   }
@@ -207,7 +260,7 @@ exports.deleteProduct = asyncHandler(async (req, res) => {
 // @route   PATCH /api/admin/products/:id/toggle
 // @access  Admin
 exports.togglePublishStatus = asyncHandler(async (req, res) => {
-  const product = await Product.findById(req.params.id);
+  const product = await findProductById(req.params.id);
   if (!product || product.isDeleted) {
     return res.status(404).json({ success: false, message: 'Product not found' });
   }

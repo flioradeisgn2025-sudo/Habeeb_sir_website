@@ -2,6 +2,7 @@ const express = require('express');
 const {
   getAdminProducts,
   createProduct,
+  importProducts,
   updateProduct,
   deleteProduct,
   togglePublishStatus
@@ -11,6 +12,8 @@ const router = express.Router();
 
 // Map admin routes to standard HTTP verbs
 // These will be mounted at /api/admin/products
+router.post('/import', importProducts);
+
 router.route('/')
   .get(getAdminProducts)
   .post(createProduct);
